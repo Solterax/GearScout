@@ -1,0 +1,8 @@
+/work/
+/artifacts/
+/*.zip
+/README-GearScout.md
+**/bin/
+**/obj/
+.vs/
+.idea/

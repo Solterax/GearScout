@@ -1,0 +1,28 @@
+[
+  {
+    "Author": "Solterax",
+    "Name": "GearScout",
+    "InternalName": "GearScout",
+    "AssemblyVersion": "0.1.0.0",
+    "Description": "Import XIVGear links and compare gear against equipped items, bags, and Armoury Chest. Only sets for the current job are displayed.",
+    "ApplicableVersion": "any",
+    "Tags": [
+      "gear",
+      "xivgear",
+      "inventory"
+    ],
+    "DalamudApiLevel": 15,
+    "LoadRequiredState": 0,
+    "LoadSync": false,
+    "CanUnloadAsync": false,
+    "LoadPriority": 0,
+    "Punchline": "Track your XIVGear sets for your current job.",
+    "AcceptsFeedback": true,
+    "RepoUrl": "https://github.com/Solterax/GearScout",
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.1.0/GearScout-plugin.zip",
+    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.1.0/GearScout-plugin.zip",
+    "LastUpdate": "1793144894"
+  }
+]

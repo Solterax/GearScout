@@ -1,0 +1,11 @@
+using Dalamud.Configuration;
+
+namespace GearScout;
+
+[Serializable]
+public sealed class Configuration : IPluginConfiguration
+{
+    public int Version { get; set; } = 1;
+    public List<TrackedSet> Sets { get; set; } = [];
+    public Dictionary<string, Guid> SelectedByJob { get; set; } = [];
+}
