@@ -1,4 +1,4 @@
-# GearScout 0.1.0
+# GearScout 0.2.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -20,7 +20,10 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 - Updates approximately once per second while the window is open; login, loading and character/job changes clear the old snapshot.
 - **Equipped** means a matching copy is worn; **Owned** means it is in a checked bag or Armoury Chest; **Missing** means absent from the checked storage.
 - Duplicate items require enough physical copies. One ring cannot satisfy two ring slots. The side on which a matching ring is worn does not matter.
-- HQ and NQ copies both count. This is an item checklist, not a stat or meld validator. Materia, food, relic stat allocations, and item quality are not validated.
+- HQ and NQ copies both count. Food, relic stat allocations, and item quality are not validated.
+- Materia is compared by item ID (type and grade), with duplicates counted separately. Order does not matter, and all five meld slots are checked. Exact matches require no missing or extra materia.
+- Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
+- Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
 - Retainers, chocobo saddlebags, glamour dresser, armoire and other characters are excluded. An item in those places can appear as missing. Move it to your bags or Armoury Chest to have it counted.
 - Custom/negative XIVGear item IDs are unsupported. Invalid imports report an error and leave the previous saved sets intact.
 - Saved target sets are shared by the plugin configuration; ownership is always read from the current character and is never persisted.
@@ -45,7 +48,7 @@ dotnet run --project Tests/GearScout.Tests.csproj -- --live
 
 ## Validation status
 
-Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover single-set and multi-set imports, invalid links, missing jobs, null slots, duplicate rings, and item matching. The supplied Bard URL has also been tested against the live API. In-game loading, appearance and live inventory/job transitions still need manual verification; compilation does not prove those behaviours.
+Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, invalid links, duplicate rings, materia type/grade/count checks, overmelds, copy allocation and saved-target serialization. The supplied Bard URL has also been tested against the live API. In-game loading, appearance and live inventory/job transitions still need manual verification; compilation does not prove those behaviours.
 
 Manual acceptance checks:
 
@@ -56,6 +59,9 @@ Manual acceptance checks:
 5. Test a two-ring target with one matching physical copy, then two.
 6. Reload the plugin and verify saved sets and per-job selection persist. Log into a different character and verify ownership is recalculated.
 7. Try an invalid URL and a failed network connection; verify the existing saved sets remain available.
+8. Refresh a set saved in 0.1.0; check that materia targets appear. Hover a mismatched piece and compare the lists with the game's item tooltip.
+9. Test reordered correct melds, a wrong grade, duplicate materia, missing overmelds and an extra meld on a target with no materia.
+10. With two copies of the same gear, verify the correctly melded copy is selected even if the other copy is equipped. Check **Needs work only** keeps mismatched melds visible.
 
 ## Implementation and references
 

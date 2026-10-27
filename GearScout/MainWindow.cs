@@ -16,7 +16,7 @@ internal sealed class MainWindow : Window
     public MainWindow(Plugin plugin) : base("GearScout — XIVGear tracker###GearScoutMain")
     {
         this.plugin = plugin;
-        Size = new Vector2(820, 610);
+        Size = new Vector2(1000, 650);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
         {
@@ -77,7 +77,11 @@ internal sealed class MainWindow : Window
             ImGui.EndCombo();
         }
 
-        ImGui.Checkbox("Missing only", ref missingOnly);
+        ImGui.Checkbox("Needs work only", ref missingOnly);
+        ImGui.SameLine();
+        ImGui.BeginDisabled(plugin.Importing);
+        if (ImGui.SmallButton("Refresh from link")) plugin.StartImport(selected.SourceUrl);
+        ImGui.EndDisabled();
         ImGui.SameLine();
         if (ImGui.SmallButton("Copy source link")) ImGui.SetClipboardText(selected.SourceUrl);
         ImGui.SameLine();
@@ -105,23 +109,28 @@ internal sealed class MainWindow : Window
         }
         var statuses = GearMatcher.Match(selected.Pieces, owned);
         var have = statuses.Count(s => s.Match != null);
+        var melded = statuses.Count(s => s.Melds is { IsExact: true });
         ImGui.Spacing();
         ImGui.TextUnformatted($"{have} / {statuses.Count} pieces owned   |   {statuses.Count - have} missing from checked storage");
+        ImGui.TextUnformatted($"{melded} / {statuses.Count} pieces have the target materia (hover Materia for details)");
         ImGui.ProgressBar(statuses.Count == 0 ? 0 : (float)have / statuses.Count, new Vector2(-1, 7), "");
-        ImGui.TextColored(Muted, "Item IDs only: materia, HQ quality and relic stats are not checked.");
+        ImGui.TextColored(Muted, "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
+        if (selected.Pieces.Any(p => p.Materia == null))
+            ImGui.TextColored(Amber, "Materia targets unavailable for some pieces. Click Refresh from link to update an older import.");
         ImGui.TextColored(Muted, "Retainers, saddlebag and glamour storage are not searched.");
 
-        if (!ImGui.BeginTable("gear", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
+        if (!ImGui.BeginTable("gear", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
                 ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY, new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y)))) return;
         ImGui.TableSetupColumn("Slot", ImGuiTableColumnFlags.WidthFixed, 90);
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 90);
+        ImGui.TableSetupColumn("Materia", ImGuiTableColumnFlags.WidthFixed, 135);
         ImGui.TableSetupColumn("Location", ImGuiTableColumnFlags.WidthFixed, 125);
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
         foreach (var status in statuses)
         {
-            if (missingOnly && status.Match != null) continue;
+            if (missingOnly && status.Match != null && status.Melds is { IsExact: true }) continue;
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SlotName(status.Piece.Slot));
@@ -132,9 +141,49 @@ internal sealed class MainWindow : Window
             ImGui.TextColored(status.Match != null ? Green : Amber,
                 status.Match is { Equipped: true } ? "Equipped" : status.Match != null ? "Owned" : "Missing");
             ImGui.TableNextColumn();
+            DrawMateria(status);
+            ImGui.TableNextColumn();
             ImGui.TextUnformatted(status.Match?.Location ?? "Not found");
         }
         ImGui.EndTable();
+    }
+
+    private void DrawMateria(PieceStatus status)
+    {
+        var check = status.Melds;
+        var expected = status.Piece.Materia;
+        var label = expected == null ? "Refresh targets" : status.Match == null ? "Need gear" :
+            check == null ? "Unavailable" : check.IsExact ? (expected.Count == 0 ? "No melds needed" : "Correct") :
+            $"{check.Matched}/{expected.Count} correct" + (check.Unexpected.Count > 0 ? " + extra" : "");
+        ImGui.TextColored(check is { IsExact: true } ? Green : Amber, label);
+        if (!ImGui.IsItemHovered()) return;
+        ImGui.BeginTooltip();
+        ImGui.TextUnformatted("TARGET MATERIA");
+        if (expected == null) ImGui.TextUnformatted("Refresh this set from its link to import meld targets.");
+        else DrawMateriaList(expected, "None (target expects no materia)");
+        if (status.Match != null)
+        {
+            ImGui.Separator();
+            ImGui.TextUnformatted($"ON MATCHED COPY ({status.Match.Location})");
+            if (status.Match.Materia == null) ImGui.TextUnformatted("Materia data unavailable.");
+            else DrawMateriaList(status.Match.Materia, "None");
+        }
+        if (check is { IsExact: false })
+        {
+            ImGui.Separator();
+            ImGui.TextColored(Amber, "MISSING TARGET MELDS");
+            DrawMateriaList(check.Missing, "None");
+            ImGui.TextColored(Amber, "EXTRA / DIFFERENT MELDS");
+            DrawMateriaList(check.Unexpected, "None");
+        }
+        ImGui.EndTooltip();
+    }
+
+    private void DrawMateriaList(IReadOnlyList<uint> ids, string emptyText)
+    {
+        if (ids.Count == 0) ImGui.TextUnformatted(emptyText);
+        foreach (var group in ids.GroupBy(id => id))
+            ImGui.TextUnformatted($"{group.Count()} x {plugin.ItemName(group.Key)}");
     }
 
     private void SaveSafely()

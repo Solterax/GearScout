@@ -111,7 +111,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         if (!ready || !window.IsOpen || Environment.TickCount64 < nextScan) return;
         nextScan = Environment.TickCount64 + 1000;
-        try { Owned = InventoryReader.Read(Inventory); }
+        try { Owned = InventoryReader.Read(Inventory, Data); }
         catch (Exception ex)
         {
             Owned = null;

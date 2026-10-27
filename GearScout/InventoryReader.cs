@@ -1,6 +1,7 @@
 using Dalamud.Game.Inventory;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using Lumina.Excel.Sheets;
 
 namespace GearScout;
 
@@ -27,7 +28,7 @@ internal static class InventoryReader
     ];
 
     // Called only from the Dalamud framework thread; never from the HTTP worker.
-    public static List<OwnedItem>? Read(IGameInventory inventory)
+    public static List<OwnedItem>? Read(IGameInventory inventory, IDataManager data)
     {
         var result = new List<OwnedItem>();
         foreach (var (type, label, equipped) in Containers)
@@ -38,7 +39,24 @@ internal static class InventoryReader
             foreach (ref readonly var item in slots)
             {
                 if (!item.IsEmpty && item.BaseItemId != 0 && item.Quantity > 0)
-                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped));
+                {
+                    var melds = new List<uint>();
+                    var known = true;
+                    var types = item.Materia;
+                    var grades = item.MateriaGrade;
+                    for (var index = 0; index < types.Length; index++)
+                    {
+                        if (types[index] == 0) continue;
+                        if (index >= grades.Length || !data.GetExcelSheet<Materia>().TryGetRow(types[index], out var row) ||
+                            grades[index] >= row.Item.Count || row.Item[grades[index]].RowId == 0)
+                        {
+                            known = false;
+                            break;
+                        }
+                        melds.Add(row.Item[grades[index]].RowId);
+                    }
+                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped, known ? melds : null));
+                }
             }
         }
         return result;

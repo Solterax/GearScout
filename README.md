@@ -24,9 +24,13 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 - Display only sets whose imported job matches the active class/job. Bard targets appear on Bard, not Archer.
 - Count equipped items, inventory bags, and Armoury Chest items on the current character. Refresh approximately once per second while open.
 - Show a location for matching gear and require separate physical copies for duplicate target items.
+- Compare melded materia against the imported target by type and grade, including duplicate materia and all five overmeld slots. Hover the Materia column to see required, current, missing and extra melds. Slot order is ignored.
+- Prefer correctly melded owned copies when duplicate gear exists. Use **Needs work only** to include both missing gear and incorrect or unknown melds.
 - Save target sets and per-job selection across sessions. Reimporting the same link refreshes its saved sets.
 
-**Missing** means absent from the checked storage. Retainers, saddlebags, glamour storage, and other characters are excluded. Materia, HQ quality, food, and relic stat allocations are not validated. No character or inventory data is sent to XIVGear; imports only send the supplied link to its public API.
+**Missing** means absent from the checked storage. Retainers, saddlebags, glamour storage, and other characters are excluded. HQ quality, food, and relic stat allocations are not validated. Loose materia in bags does not count as melded materia. No character or inventory data is sent to XIVGear; imports only send the supplied link to its public API.
+
+After updating from 0.1.0, click **Refresh from link** on existing sets to load their materia targets. Old saved sets remain available and show unknown materia until refreshed. An explicitly empty target expects an unmelded item; extra materia is shown as a mismatch.
 
 This is an initial version. Compilation, importer checks, inventory-matching logic, and the supplied live XIVGear URL have been verified; in-game loading, layout, and inventory/job transitions still require manual verification.
 

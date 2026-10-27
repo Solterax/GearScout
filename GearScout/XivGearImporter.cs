@@ -77,7 +77,23 @@ public static class XivGearImporter
                 if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty("id", out var id) ||
                     !id.TryGetUInt32(out var itemId) || itemId == 0)
                     throw new InvalidDataException($"Invalid or custom item in {slot}. Only game item IDs are supported.");
-                set.Pieces.Add(new GearPiece { Slot = slot, ItemId = itemId });
+                List<uint>? materia = null;
+                if (item.TryGetProperty("materia", out var melds))
+                {
+                    if (melds.ValueKind != JsonValueKind.Array || melds.GetArrayLength() > 5)
+                        throw new InvalidDataException($"Invalid materia list in {slot}.");
+                    materia = [];
+                    foreach (var meld in melds.EnumerateArray())
+                    {
+                        if (meld.ValueKind == JsonValueKind.Null) continue;
+                        if (meld.ValueKind != JsonValueKind.Object || !meld.TryGetProperty("id", out var materiaId) ||
+                            materiaId.ValueKind != JsonValueKind.Number || !materiaId.TryGetInt32(out var value) || value < -1)
+                            throw new InvalidDataException($"Invalid materia in {slot}.");
+                        // XIVGear uses -1 for an empty materia slot. Never treat it as a target item.
+                        if (value > 0) materia.Add((uint)value);
+                    }
+                }
+                set.Pieces.Add(new GearPiece { Slot = slot, ItemId = itemId, Materia = materia });
             }
             if (set.Pieces.Count > 0) result.Add(set);
         }
