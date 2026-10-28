@@ -11,72 +11,106 @@ namespace GearScout;
 internal sealed unsafe class StorageScanner
 {
     private readonly Dictionary<string, long> firstSeen = [];
+    private readonly Dictionary<string, long> lastVisible = [];
+    private readonly Dictionary<string, int> generations = [];
+    private readonly Dictionary<string, int> capturedGenerations = [];
+    private readonly HashSet<string> openLastRead = [];
+    public HashSet<string> NewlyOpenedSources { get; } = [];
     private static readonly InventoryType[] RetainerBags =
     [
         InventoryType.RetainerPage1, InventoryType.RetainerPage2, InventoryType.RetainerPage3,
         InventoryType.RetainerPage4, InventoryType.RetainerPage5, InventoryType.RetainerPage6, InventoryType.RetainerPage7,
     ];
 
-    public void Reset() => firstSeen.Clear();
+    public void Reset()
+    {
+        firstSeen.Clear(); lastVisible.Clear(); generations.Clear(); capturedGenerations.Clear();
+        openLastRead.Clear(); NewlyOpenedSources.Clear();
+    }
 
-    public List<StorageSnapshot> Read(ulong characterId, IGameGui gui, IGameInventory inventory, IDataManager data)
+    public List<StorageSnapshot> Read(ulong characterId, IGameGui gui, IGameInventory inventory, IDataManager data, bool allowRecentlyClosed = false)
     {
         var result = new List<StorageSnapshot>();
         var active = new HashSet<string>();
+        var opened = new HashSet<string>();
+        NewlyOpenedSources.Clear();
         if (characterId == 0) return result;
         ReadRetainer();
         ReadDresser();
         ReadArmoire();
         foreach (var key in firstSeen.Keys.Where(k => !active.Contains(k)).ToArray()) firstSeen.Remove(key);
+        openLastRead.Clear();
+        openLastRead.UnionWith(opened);
         return result;
 
-        bool Stable(string key)
+        bool Available(string key, bool visible)
+        {
+            if (visible)
+            {
+                opened.Add(key);
+                lastVisible[key] = Environment.TickCount64;
+                if (!openLastRead.Contains(key)) generations[key] = generations.GetValueOrDefault(key) + 1;
+                return true;
+            }
+            // A short identity-bound grace period catches server-confirmed transfers that arrive as a window closes.
+            return allowRecentlyClosed && lastVisible.TryGetValue(key, out var seen) && Environment.TickCount64 - seen <= 3000;
+        }
+
+        bool Stable(string key, int waitMilliseconds = 2000)
         {
             active.Add(key);
             if (!firstSeen.TryGetValue(key, out var since))
             {
                 firstSeen[key] = Environment.TickCount64;
-                return false;
+                return waitMilliseconds == 0;
             }
-            return Environment.TickCount64 - since >= 2000;
+            return Environment.TickCount64 - since >= waitMilliseconds;
         }
 
-        void Add(string key, string name, List<StoredItem> items) => result.Add(new()
+        void Add(string key, string name, List<StoredItem> items, string? group = null)
         {
-            CharacterId = characterId, Key = key, Name = name,
-            CheckedAtUtc = DateTimeOffset.UtcNow, Items = items,
-        });
+            var generation = generations.GetValueOrDefault(group ?? key);
+            if (capturedGenerations.GetValueOrDefault(key, -1) != generation)
+            {
+                NewlyOpenedSources.Add(key);
+                capturedGenerations[key] = generation;
+            }
+            result.Add(new() { CharacterId = characterId, Key = key, Name = name, CheckedAtUtc = DateTimeOffset.UtcNow, Items = items });
+        }
 
         void ReadRetainer()
         {
             // LastSelectedRetainerId persists after closing the bell: never use it without an open inventory.
-            if (!Open("InventoryRetainer") && !Open("InventoryRetainerLarge") && !Open("RetainerCharacter")) return;
+            var visible = Open("InventoryRetainer") || Open("InventoryRetainerLarge") || Open("RetainerCharacter");
             var manager = RetainerManager.Instance();
             if (manager == null || !manager->IsReady) return;
             var retainer = manager->GetActiveRetainer();
             if (retainer == null || retainer->RetainerId == 0 || retainer->RetainerId != manager->LastSelectedRetainerId) return;
             var id = retainer->RetainerId;
-            var ordering = ItemOrderModule.Instance();
-            if (ordering == null || ordering->ActiveRetainerId != id) return;
             var key = $"retainer:{id}";
+            if (!Available(key, visible)) return;
+            var ordering = ItemOrderModule.Instance();
+            if (ordering == null || (ordering->ActiveRetainerId != id &&
+                !(allowRecentlyClosed && !visible && ordering->ActiveRetainerId == 0))) return;
             if (!Stable(key)) return;
             var name = retainer->NameString;
             if (string.IsNullOrWhiteSpace(name)) name = id.ToString();
             var bags = ReadContainers(RetainerBags, inventory, data);
-            if (bags != null) Add(key + ":bags", $"Retainer: {name} / bags", bags);
+            if (bags != null) Add(key + ":bags", $"Retainer: {name} / bags", bags, key);
             var equipped = ReadContainers([InventoryType.RetainerEquippedItems], inventory, data);
-            if (equipped != null) Add(key + ":equipped", $"Retainer: {name} / equipped", equipped);
+            if (equipped != null) Add(key + ":equipped", $"Retainer: {name} / equipped", equipped, key);
         }
 
         void ReadDresser()
         {
             var agent = AgentMiragePrismPrismBox.Instance();
             var mirage = MirageManager.Instance();
-            if (!Open("MiragePrismPrismBox") || agent == null || !agent->IsAgentActive() ||
+            var visible = Open("MiragePrismPrismBox");
+            if (!Available("dresser", visible) || agent == null || (visible && !agent->IsAgentActive()) ||
                 !agent->IsDataLoaded || agent->Data == null || mirage == null || !mirage->PrismBoxLoaded ||
                 !agent->Data->IsAsyncLoadComplete || !agent->Data->IsPopulatingComplete || agent->Data->IsPopulatingList)
                 return;
-            if (!Stable("dresser")) return;
+            if (!Stable("dresser", 0)) return;
             var items = new List<StoredItem>();
             var seen = new HashSet<(uint Slot, uint ItemId)>();
             // This array includes expanded outfit pieces across every page/filter, not glamour plates.
@@ -92,9 +126,9 @@ internal sealed unsafe class StorageScanner
 
         void ReadArmoire()
         {
-            if (!Open("Cabinet") && !Open("CabinetWithdraw")) return;
+            if (!Available("armoire", Open("Cabinet") || Open("CabinetWithdraw"))) return;
             var ui = UIState.Instance();
-            if (ui == null || !ui->Cabinet.IsCabinetLoaded() || !Stable("armoire")) return;
+            if (ui == null || !ui->Cabinet.IsCabinetLoaded() || !Stable("armoire", 0)) return;
             var items = new List<StoredItem>();
             foreach (var row in data.GetExcelSheet<CabinetRow>())
             {

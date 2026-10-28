@@ -6,6 +6,9 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Game.ClientState.Conditions;
 using Lumina.Excel.Sheets;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Inventory.InventoryEventArgTypes;
 
 namespace GearScout;
 
@@ -38,6 +41,9 @@ public sealed class Plugin : IDalamudPlugin
     private long nextStorageSave;
     private bool storageScanRequested;
     private bool storageSavePending;
+    private long storageRefreshUntil;
+    private bool storageRefreshPending;
+    private static readonly string[] StorageAddons = ["InventoryRetainer", "InventoryRetainerLarge", "RetainerCharacter", "MiragePrismPrismBox", "Cabinet", "CabinetWithdraw"];
 
     internal Configuration Config { get; }
     internal string CurrentJob { get; private set; } = "";
@@ -48,6 +54,8 @@ public sealed class Plugin : IDalamudPlugin
     internal ulong CharacterId => characterId;
     internal string StorageStatus { get; private set; } = "Open each storage location in game to save its contents.";
     internal GearCatalog Catalog { get; }
+    internal RetainerScanController RetainerScan { get; }
+    internal bool StorageSavePending => storageSavePending;
 
     public Plugin()
     {
@@ -61,6 +69,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         window = new MainWindow(this);
         Catalog = new GearCatalog(Data);
+        RetainerScan = new RetainerScanController(this);
         setEditor = new SetEditorWindow(this);
         lootHighlighter = new LootHighlighter(this);
         lootHighlighter.Initialize();
@@ -72,6 +81,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi += Open;
         PluginInterface.UiBuilder.OpenConfigUi += Open;
         Framework.Update += Update;
+        Inventory.InventoryChanged += OnInventoryChanged;
+        AddonLifecycle.RegisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
+        AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);
     }
 
     private void OnCommand(string command, string args) => Open();
@@ -106,6 +118,32 @@ public sealed class Plugin : IDalamudPlugin
         storageScanRequested = true;
         nextStorageScan = 0;
         StorageStatus = "Checking open storage. Wait for it to finish loading.";
+    }
+
+    private void OnInventoryChanged(IReadOnlyCollection<InventoryEventArgs> events)
+    {
+        if (events.Count == 0) return;
+        storageRefreshPending = true;
+        storageRefreshUntil = Environment.TickCount64 + 3000;
+        // Coalesce slot/stack transfer bursts and read the server-confirmed contents after they settle.
+        nextStorageScan = Environment.TickCount64 + 150;
+        nextScan = Math.Min(nextScan, nextStorageScan);
+    }
+
+    private void OnStorageOpened(AddonEvent type, AddonArgs args)
+    {
+        storageRefreshPending = true;
+        storageRefreshUntil = Environment.TickCount64 + 3000;
+        nextStorageScan = 0;
+    }
+
+    private void OnStorageClosing(AddonEvent type, AddonArgs args)
+    {
+        storageRefreshPending = true;
+        storageRefreshUntil = Environment.TickCount64 + 3000;
+        nextStorageScan = 0;
+        // PreFinalize still owns valid data. Capture it before teardown, then allow short follow-up reads.
+        if (characterId != 0 && Player.IsLoaded && Player.ContentId == characterId) UpdateStorage();
     }
 
     internal void ForgetStorage(string key)
@@ -175,6 +213,8 @@ public sealed class Plugin : IDalamudPlugin
                 storageScanner.Reset();
                 nextStorageScan = 0;
                 storageScanRequested = false;
+                storageRefreshPending = false;
+                storageRefreshUntil = 0;
                 StorageStatus = "Open each storage location in game to save its contents for this character.";
             }
             CurrentJob = job;
@@ -183,6 +223,7 @@ public sealed class Plugin : IDalamudPlugin
             nextScan = Environment.TickCount64 + 500;
         }
         if (ready) UpdateStorage();
+        RetainerScan.Update(ready);
         // Loot highlighting needs fresh ownership even when the checklist is closed.
         if (!window.IsOpen && !Config.HighlightLoot)
         {
@@ -207,15 +248,18 @@ public sealed class Plugin : IDalamudPlugin
             nextStorageScan = Environment.TickCount64 + 500;
             try
             {
-                var snapshots = storageScanner.Read(characterId, GameGui, Inventory, Data);
+                var snapshots = storageScanner.Read(characterId, GameGui, Inventory, Data,
+                    Environment.TickCount64 <= storageRefreshUntil);
                 var changed = false;
                 foreach (var snapshot in snapshots)
-                    changed |= StorageCache.Replace(Config.StorageSnapshots, snapshot, storageScanRequested);
+                    changed |= StorageCache.Replace(Config.StorageSnapshots, snapshot,
+                        storageScanRequested || storageRefreshPending || storageScanner.NewlyOpenedSources.Contains(snapshot.Key));
                 if (snapshots.Count > 0 && !storageSavePending)
                     StorageStatus = "Checked: " + string.Join(", ", snapshots.Select(s => s.Name));
                 else if (storageScanRequested)
                     StorageStatus = "Open a retainer inventory, glamour dresser or armoire and wait for loading. Checks save automatically once ready.";
                 storageScanRequested = false;
+                if (snapshots.Count > 0 || Environment.TickCount64 > storageRefreshUntil) storageRefreshPending = false;
                 if (changed)
                 {
                     storageSavePending = true;
@@ -256,6 +300,10 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
+        RetainerScan.Stop();
+        Inventory.InventoryChanged -= OnInventoryChanged;
+        AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
+        AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);
         if (storageSavePending)
         {
             try { Save(); }

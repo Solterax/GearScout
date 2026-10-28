@@ -60,17 +60,19 @@ The glow, badge and blue name appear only while Need or Greed is available and c
 
 ## Check storage once, remember it locally
 
-1. Update GearScout, then manually open each retainer's inventory at a summoning bell. Leave it open for a few seconds until loading completes. Open retainer equipment too if it has not loaded with the bags.
-2. Manually open your glamour dresser and armoire, allowing each to finish loading.
-3. In `/gearscout`, expand **Saved storage checks** to see the sources, item counts and last-checked times. **Scan open storage** requests an immediate recheck; completed checks also save automatically while those stores are open.
+1. Open a summoning bell to its retainer list. In `/gearscout`, expand **Saved storage checks** and click **Scan all retainers**. GearScout opens each available retainer's inventory, waits for a complete local save, returns to the list and continues. Progress and a **Stop retainer scan** button appear during the scan. You can also open retainer inventories individually. Open retainer equipment too if it has not loaded with the bags.
+2. Open your glamour dresser and armoire, allowing each to finish loading. Opening any supported storage automatically saves its first complete check, even with the GearScout checklist closed.
+3. Moving items triggers another check and local save. Changes are also detected while storage stays open, with a short follow-up period after closing to catch completed transfers. **Scan open storage** remains available as an immediate recheck; no manual scan is required for normal use.
 
 The full loaded contents are saved in Dalamud's local GearScout configuration and associated with the current character. Retainers have independent bag/equipment checks. A new check replaces the old contents of that source, including when it becomes empty; unopened or partially loaded storage does not erase a previous check. Retainer materia is retained, and dresser/armoire items are treated as unmelded.
 
-These are last-known contents, not a remote live inventory. Reopen storage after moving/removing items, especially if changes happened with GearScout disabled. Stale checks can otherwise count a removed item, or count a transferred copy twice. **Forget** removes an old source from ownership calculations; an open storage source will be detected again. Sources not yet visited have no saved ownership data. Nothing is uploaded to GitHub or any inventory service.
+The retainer loop only navigates the list, inventory and Quit menus. It does not move items, collect ventures or accept confirmation dialogs. It stops on character changes, loading timeouts, unexpected dialogs or a different retainer being selected. **Stop** leaves the current game window open and retains completed saves.
+
+These are last-known contents, not a remote live inventory. Reopen storage after changes made while GearScout was disabled. Stale checks can otherwise count a removed item, or count a transferred copy twice. **Forget** removes an old source from ownership calculations; an open storage source will be detected again. Sources not yet visited have no saved ownership data. Nothing is uploaded to GitHub or any inventory service.
 
 After updating from 0.1.0, click **Refresh from link** on existing sets to load their materia targets. Old saved sets remain available and show unknown materia until refreshed. An explicitly empty target expects an unmelded item; extra materia is shown as a mismatch.
 
-Compilation, editor search/draft rules, importer checks, inventory/materia matching, loot rules, saved-storage replacement/persistence/character isolation, and the supplied live XIVGear URL have been verified. The editor UI, native storage reads and transfers, in-game loading, inventory/job transitions, and loot indicator appearance still require manual verification.
+Compilation, retainer-scan sequencing/cancellation/timeouts, editor search/draft rules, importer checks, inventory/materia matching, loot rules, saved-storage replacement/persistence/character isolation, and the supplied live XIVGear URL have been verified. The editor UI, native retainer navigation, storage reads and transfers, in-game loading, inventory/job transitions, and loot indicator appearance still require manual verification.
 
 ## Build and test
 

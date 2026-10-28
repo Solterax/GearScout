@@ -176,7 +176,21 @@ internal sealed class MainWindow : Window
     private void DrawStorage()
     {
         if (!ImGui.CollapsingHeader("Saved storage checks")) return;
-        ImGui.TextWrapped("Manually open each retainer's inventory, the glamour dresser and the armoire. GearScout saves complete loaded contents automatically and refreshes them while open.");
+        ImGui.TextWrapped("Storage saves automatically on opening and after item transfers. To check every retainer, open a summoning bell to its retainer list and start a scan.");
+        if (plugin.RetainerScan.Session.Running)
+        {
+            if (ImGui.Button("Stop retainer scan")) plugin.RetainerScan.Stop();
+            ImGui.ProgressBar((float)plugin.RetainerScan.Session.Completed / Math.Max(1, plugin.RetainerScan.Session.Total), new Vector2(-1, 8), "");
+        }
+        else
+        {
+            ImGui.BeginDisabled(!plugin.RetainerScan.CanStart);
+            if (ImGui.Button("Scan all retainers")) plugin.RetainerScan.RequestStart();
+            ImGui.EndDisabled();
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip("Open the summoning bell's retainer list first. This visits available retainers one at a time, saves their inventories, then returns to the list.");
+        }
+        ImGui.TextWrapped(plugin.RetainerScan.Session.Status);
         if (ImGui.Button("Scan open storage")) plugin.RequestStorageScan();
         ImGui.TextWrapped(plugin.StorageStatus);
         ImGui.TextColored(Muted, "Last-known contents can become stale. Forget old checks or reopen storage to refresh.");

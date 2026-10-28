@@ -227,6 +227,61 @@ Check(savedGlam.IsGlam && savedGlam.Job == "" && savedGlam.Pieces.Count == 3, "G
 Check(GearSearch.Draft(glam).IsGlam && GearSearch.Draft(glam).Id == glam.Id, "Editing a glam set preserves its type and identity");
 Check(!System.Text.Json.JsonSerializer.Deserialize<TrackedSet>("{\"Job\":\"BRD\"}")!.IsGlam, "Older saved job sets remain regular sets");
 
+var retainerScan = new RetainerScanSession();
+RetainerScanTarget[] retainers = [new(10, "First"), new(20, "Second"), new(10, "Duplicate"), new(0, "Invalid")];
+var waiting = new RetainerScanObservation(100, true, false, false, false, 0, false, false);
+Reject(() => retainerScan.Start([], 100, 0), "Empty retainer roster is rejected");
+Reject(() => retainerScan.Start(retainers, 0, 0), "Retainer scan requires character identity");
+retainerScan.Start(retainers, 100, 0);
+Check(retainerScan.Total == 2 && retainerScan.Current!.Id == 10, "Retainer queue removes invalid and duplicate identities");
+Check(retainerScan.Tick(waiting, 1) == RetainerScanAction.None, "Retainer scan waits for the bell list");
+for (var i = 0; i < 2; i++)
+{
+    var id = retainers[i].Id;
+    var now = i * 1000 + 10;
+    Check(retainerScan.Tick(waiting with { ListReady = true }, now) == RetainerScanAction.SelectRetainer,
+        "Select next available retainer from list");
+    Check(retainerScan.Tick(waiting with { ActiveRetainerId = 99 }, now + 1) == RetainerScanAction.None && retainerScan.Running,
+        "Old selected identity during loading does not cancel navigation");
+    var menu = waiting with { MenuReady = true, ActiveRetainerId = id };
+    Check(retainerScan.Tick(menu, now + 2) == RetainerScanAction.OpenInventory, "Open inventory only for the intended retainer");
+    Check(retainerScan.Tick(menu, now + 3) == RetainerScanAction.None, "Do not repeat inventory callback while loading");
+    Check(retainerScan.Tick(menu with { InventoryReady = true }, now + 4) == RetainerScanAction.None,
+        "Loaded inventory stays open until its snapshot is saved");
+    Check(retainerScan.Tick(menu with { SnapshotSaved = true }, now + 5) == RetainerScanAction.None,
+        "Saved data alone cannot close an inventory that is not ready");
+    var savedInventory = menu with { InventoryReady = true, SnapshotSaved = true };
+    Check(retainerScan.Tick(savedInventory, now + 6) == RetainerScanAction.CloseInventory, "Close only after inventory is ready and persisted");
+    Check(retainerScan.Tick(savedInventory, now + 7) == RetainerScanAction.None, "Do not quit until inventory finishes closing");
+    Check(retainerScan.Tick(menu, now + 8) == RetainerScanAction.QuitRetainer, "Quit through the returned retainer menu");
+    Check(retainerScan.Tick(waiting, now + 9) == RetainerScanAction.None && retainerScan.Completed == i,
+        "Do not advance until the bell list returns");
+    retainerScan.Tick(waiting with { ListReady = true }, now + 10);
+    Check(retainerScan.Completed == i + 1, "Count each completed inventory once");
+}
+Check(!retainerScan.Running && retainerScan.Phase == RetainerScanPhase.Complete && retainerScan.Current == null,
+    "Retainer scan finishes after the last retainer");
+Check(retainerScan.Tick(waiting with { ListReady = true }, 5000) == RetainerScanAction.None, "Completed scan sends no callbacks");
+foreach (var interruption in new[]
+{
+    waiting with { CharacterId = 200 }, waiting with { PlayerReady = false }, waiting with { UnexpectedDialog = true },
+})
+{
+    retainerScan.Start(retainers, 100, 0);
+    Check(retainerScan.Tick(interruption, 1) == RetainerScanAction.None && !retainerScan.Running,
+        "Character changes, loading and unexpected dialogs stop automation");
+}
+retainerScan.Start(retainers, 100, 0);
+Check(retainerScan.Tick(waiting, 30001) == RetainerScanAction.None && !retainerScan.Running, "Retainer loading timeout stops callbacks");
+retainerScan.Start(retainers, 100, 0);
+retainerScan.Tick(waiting with { ListReady = true }, 1);
+Check(retainerScan.Tick(waiting with { MenuReady = true, ActiveRetainerId = 20 }, 2) == RetainerScanAction.None && !retainerScan.Running,
+    "Selecting another retainer cancels before any menu action");
+retainerScan.Start(retainers, 100, 0);
+retainerScan.Stop();
+Check(retainerScan.Tick(waiting with { ListReady = true }, 1) == RetainerScanAction.None && !retainerScan.Running,
+    "Stop button prevents further navigation");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
