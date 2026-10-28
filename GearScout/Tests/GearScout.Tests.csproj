@@ -10,6 +10,7 @@
     <Compile Include="../XivGearImporter.cs" Link="XivGearImporter.cs" />
     <Compile Include="../LootMatcher.cs" Link="LootMatcher.cs" />
     <Compile Include="../StorageCache.cs" Link="StorageCache.cs" />
+    <Compile Include="../GearSearch.cs" Link="GearSearch.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

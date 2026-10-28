@@ -13,7 +13,7 @@ internal sealed class MainWindow : Window
     private static readonly Vector4 Amber = new(1, 0.73f, 0.35f, 1);
     private static readonly Vector4 Muted = new(0.65f, 0.7f, 0.76f, 1);
 
-    public MainWindow(Plugin plugin) : base("GearScout — XIVGear tracker###GearScoutMain")
+    public MainWindow(Plugin plugin) : base("GearScout — Gear sets###GearScoutMain")
     {
         this.plugin = plugin;
         Size = new Vector2(1000, 650);
@@ -27,7 +27,7 @@ internal sealed class MainWindow : Window
 
     public override void Draw()
     {
-        ImGui.TextUnformatted("XIVGEAR  /  GEAR CHECKLIST");
+        ImGui.TextUnformatted("GEARSCOUT  /  GEAR SETS");
         ImGui.TextColored(Muted, "Equipped gear + bags + Armoury Chest + saved storage checks.");
         var highlightLoot = plugin.Config.HighlightLoot;
         if (ImGui.Checkbox("Blue glow on missing set items", ref highlightLoot))
@@ -61,11 +61,13 @@ internal sealed class MainWindow : Window
             return;
         }
         ImGui.TextUnformatted($"Current job: {job}");
+        ImGui.SameLine();
+        if (ImGui.Button("New set")) plugin.CreateSet();
         var sets = plugin.Config.Sets.Where(s => s.Job == job).ToList();
         if (sets.Count == 0)
         {
             ImGui.Spacing();
-            ImGui.TextWrapped($"No saved sets for {job}. Import a link for this job. Other jobs' sets appear when you switch jobs.");
+            ImGui.TextWrapped($"No saved sets for {job}. Click New set to build one here, or import a link. Other jobs' sets appear when you switch jobs.");
             return;
         }
 
@@ -87,13 +89,16 @@ internal sealed class MainWindow : Window
             ImGui.EndCombo();
         }
 
+        var local = string.IsNullOrWhiteSpace(selected.SourceUrl);
+        if (ImGui.SmallButton(local ? "Edit set" : "Edit local copy")) plugin.EditSet(selected);
+        ImGui.SameLine();
         ImGui.Checkbox("Needs work only", ref missingOnly);
         ImGui.SameLine();
-        ImGui.BeginDisabled(plugin.Importing);
+        ImGui.BeginDisabled(plugin.Importing || local);
         if (ImGui.SmallButton("Refresh from link")) plugin.StartImport(selected.SourceUrl);
-        ImGui.EndDisabled();
         ImGui.SameLine();
         if (ImGui.SmallButton("Copy source link")) ImGui.SetClipboardText(selected.SourceUrl);
+        ImGui.EndDisabled();
         ImGui.SameLine();
         if (ImGui.SmallButton("Remove set")) ImGui.OpenPopup("Remove this set?");
         if (ImGui.BeginPopup("Remove this set?"))
@@ -111,6 +116,7 @@ internal sealed class MainWindow : Window
             ImGui.EndPopup();
         }
 
+        if (selected.Pieces.Count == 0) ImGui.TextWrapped("This set is empty. Click Edit set to choose gear for its slots.");
         var owned = plugin.Owned;
         if (owned == null)
         {
@@ -122,10 +128,11 @@ internal sealed class MainWindow : Window
         var melded = statuses.Count(s => s.Melds is { IsExact: true });
         ImGui.Spacing();
         ImGui.TextUnformatted($"{have} / {statuses.Count} pieces owned   |   {statuses.Count - have} missing from checked storage");
-        ImGui.TextUnformatted($"{melded} / {statuses.Count} pieces have the target materia (hover Materia for details)");
+        var plannedMelds = statuses.Count(s => s.Piece.Materia != null);
+        if (plannedMelds > 0) ImGui.TextUnformatted($"{melded} / {plannedMelds} pieces have the planned materia (hover Materia for details)");
         ImGui.ProgressBar(statuses.Count == 0 ? 0 : (float)have / statuses.Count, new Vector2(-1, 7), "");
         ImGui.TextColored(Muted, "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
-        if (selected.Pieces.Any(p => p.Materia == null))
+        if (!local && selected.Pieces.Any(p => p.Materia == null))
             ImGui.TextColored(Amber, "Materia targets unavailable for some pieces. Click Refresh from link to update an older import.");
         ImGui.TextColored(Muted, "Retainers, dresser and armoire use last checked contents. Reopen them after changes.");
 
@@ -140,18 +147,19 @@ internal sealed class MainWindow : Window
         ImGui.TableHeadersRow();
         foreach (var status in statuses)
         {
-            if (missingOnly && status.Match != null && status.Melds is { IsExact: true }) continue;
+            if (missingOnly && status.Match != null && (status.Melds is { IsExact: true } || (local && status.Piece.Materia == null))) continue;
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SlotName(status.Piece.Slot));
             ImGui.TableNextColumn();
-            ImGui.TextWrapped(plugin.ItemName(status.Piece.ItemId));
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"Item ID: {status.Piece.ItemId}");
+            if (ImGui.Selectable($"{plugin.ItemName(status.Piece.ItemId)}##edit-{status.Piece.Slot}"))
+                plugin.EditSet(selected, status.Piece.Slot);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{plugin.ItemName(status.Piece.ItemId)}\nItem ID: {status.Piece.ItemId}\nClick to change this slot in the set editor.");
             ImGui.TableNextColumn();
             ImGui.TextColored(status.Match != null ? Green : Amber,
                 status.Match is { Equipped: true } ? "Equipped" : status.Match != null ? "Owned" : "Missing");
             ImGui.TableNextColumn();
-            DrawMateria(status);
+            DrawMateria(status, local);
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(status.Match?.Location ?? "Not found");
             if (status.Match?.LastCheckedUtc is { } checkedAt && ImGui.IsItemHovered())
@@ -192,18 +200,18 @@ internal sealed class MainWindow : Window
         }
     }
 
-    private void DrawMateria(PieceStatus status)
+    private void DrawMateria(PieceStatus status, bool local)
     {
         var check = status.Melds;
         var expected = status.Piece.Materia;
-        var label = expected == null ? "Refresh targets" : status.Match == null ? "Need gear" :
+        var label = expected == null ? (local ? "Not specified" : "Refresh targets") : status.Match == null ? "Need gear" :
             check == null ? "Unavailable" : check.IsExact ? (expected.Count == 0 ? "No melds needed" : "Correct") :
             $"{check.Matched}/{expected.Count} correct" + (check.Unexpected.Count > 0 ? " + extra" : "");
         ImGui.TextColored(check is { IsExact: true } ? Green : Amber, label);
         if (!ImGui.IsItemHovered()) return;
         ImGui.BeginTooltip();
         ImGui.TextUnformatted("TARGET MATERIA");
-        if (expected == null) ImGui.TextUnformatted("Refresh this set from its link to import meld targets.");
+        if (expected == null) ImGui.TextUnformatted(local ? "No materia target is specified for this piece." : "Refresh this set from its link to import meld targets.");
         else DrawMateriaList(expected, "None (target expects no materia)");
         if (status.Match != null)
         {

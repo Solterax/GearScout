@@ -153,6 +153,59 @@ Check(!StorageCache.Merge([], storage, 100)!.Any(i => i.ItemId == 10), "Forgetti
 Reject(() => StorageCache.Replace(storage, Snapshot(0, "dresser")), "Storage scan without character identity rejected");
 Reject(() => StorageCache.Replace(storage, Snapshot(100, "bad", new StoredItem { ItemId = 0, Quantity = 1 })), "Invalid storage entries cannot erase a saved check");
 
+var bard = GearSearch.JobBit("BRD");
+var warrior = GearSearch.JobBit("WAR");
+var headSlot = GearSearch.SlotBit("Head");
+var bodySlot = GearSearch.SlotBit("Body");
+var ringSlots = GearSearch.SlotBit("RingLeft") | GearSearch.SlotBit("RingRight");
+GearCandidate[] catalog =
+[
+    new(100, "Bard Test Hat", 700, 100, headSlot, bard, false),
+    new(101, "Warrior Test Hat", 790, 100, headSlot, warrior, false),
+    new(102, "Bard Test Coat", 790, 100, bodySlot, bard, false),
+    new(103, "Bard Better Hat", 790, 100, headSlot, bard, false),
+    new(104, "Shared Test Hat", 600, 90, headSlot, bard | warrior, false),
+    new(105, "Unique Test Ring", 790, 100, ringSlots, bard, true),
+    new(106, "Common Test Ring", 700, 100, ringSlots, bard, false),
+];
+Check(GearSearch.Search(catalog, "BRD", "Head", "").Select(i => i.ItemId).SequenceEqual(new uint[] { 103, 100, 104 }), "Editor search filters job and slot and orders by item level");
+Check(GearSearch.Search(catalog, "WAR", "Head", "test").Select(i => i.ItemId).SequenceEqual(new uint[] { 101, 104 }), "Shared gear appears only for allowed jobs");
+Check(GearSearch.Search(catalog, "brd", "Head", "TEST BARD").Single().ItemId == 100, "Gear search matches words case-insensitively in any order");
+Check(GearSearch.Search(catalog, "BRD", "Head", "103").Single().ItemId == 103, "Gear search accepts an exact item ID");
+Check(GearSearch.Search(catalog, "BRD", "Body", "hat").Count == 0, "Search never offers a matching name in the wrong slot");
+Check(GearSearch.Search(catalog, "BRD", "OffHand", "").Count == 0, "Jobs without matching off-hand gear get no invalid suggestions");
+Check(GearSearch.Search(catalog, "unknown", "Head", "").Count == 0, "Unknown job does not reveal unrestricted search results");
+Check(GearSearch.Fits(catalog[5], "BRD", "RingLeft") && GearSearch.Fits(catalog[5], "BRD", "RingRight"), "Ring candidates fit both ring slots");
+var edited = new TrackedSet { Job = "BRD", Name = "Editor test" };
+GearSearch.SetPiece(edited, "Head", catalog[0]);
+Check(edited.Pieces.Single().ItemId == 100 && edited.Pieces[0].Materia == null, "New selected piece has an unspecified materia target");
+edited.Pieces[0].Materia = [41772];
+GearSearch.SetPiece(edited, "Head", catalog[0]);
+Check(edited.Pieces[0].Materia!.Count == 1, "Reselecting the same item preserves its materia plan");
+GearSearch.SetPiece(edited, "Head", catalog[3]);
+Check(edited.Pieces.Count == 1 && edited.Pieces[0].ItemId == 103 && edited.Pieces[0].Materia == null, "Changing an item replaces the slot and clears old materia targets");
+Reject(() => GearSearch.SetPiece(edited, "Head", catalog[1]), "Editor rejects gear for another job");
+Reject(() => GearSearch.SetPiece(edited, "Body", catalog[0]), "Editor rejects gear in the wrong slot");
+GearSearch.SetPiece(edited, "RingLeft", catalog[5]);
+Reject(() => GearSearch.SetPiece(edited, "RingRight", catalog[5]), "Unique ring cannot be selected in both slots");
+GearSearch.SetPiece(edited, "RingLeft", catalog[6]);
+GearSearch.SetPiece(edited, "RingRight", catalog[6]);
+Check(edited.Pieces.Count(p => p.ItemId == 106) == 2, "Non-unique identical rings remain supported");
+var importedSource = new TrackedSet { Job = "BRD", Name = "Imported", SourceUrl = "https://xivgear.app/sl/test", Pieces = [new() { Slot = "Head", ItemId = 100, Materia = [41772] }] };
+var customDraft = GearSearch.Draft(importedSource);
+customDraft.Pieces[0].Materia!.Clear();
+GearSearch.SetPiece(customDraft, "Head", catalog[3]);
+Check(customDraft.Id != importedSource.Id && customDraft.SourceUrl == "" && importedSource.Pieces[0].ItemId == 100 && importedSource.Pieces[0].Materia!.Count == 1,
+    "Editing an imported set makes an independent local copy without changing the source");
+var localDraft = GearSearch.Draft(edited);
+localDraft.Pieces.Clear();
+Check(localDraft.Id == edited.Id && edited.Pieces.Count > 0, "Editing a local set retains identity and keeps changes isolated until saved");
+var persistedSet = System.Text.Json.JsonSerializer.Deserialize<TrackedSet>(System.Text.Json.JsonSerializer.Serialize(edited))!;
+Check(persistedSet.Id == edited.Id && persistedSet.Job == "BRD" && persistedSet.SourceUrl == "" && persistedSet.Pieces.Count == edited.Pieces.Count,
+    "Locally built set survives serialization with its identity and pieces");
+Check(LootMatcher.MissingItems([edited], []).Contains(103), "Locally built items participate in missing-loot checks");
+Check(!LootMatcher.MissingItems([edited], [new(103, 1, "Bag", false)]).Contains(103), "Owned local-set gear suppresses its loot highlight");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

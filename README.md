@@ -1,6 +1,6 @@
 # GearScout
 
-Import XIVGear gear sets into an in-game Dalamud checklist. Switch between saved sets for your active class/job and see which pieces are equipped, owned, or missing from checked storage.
+Build gear sets inside the game or import them from XIVGear. Switch between saved sets for your active class/job and see which pieces are equipped, owned, or missing from checked storage.
 
 ## Install
 
@@ -18,9 +18,21 @@ If you already loaded GearScout as a development plugin, disable that copy befor
 
 Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 
+## Build a set in game
+
+1. Open `/gearscout` and click **New set**. The set belongs to the job you are currently playing.
+2. Give it a name. Click **Select gear...** beside a slot (or click the existing piece) to open the search text box.
+3. Search by item name, words in any order, or item ID. Results are filtered to equipment that fits the slot and can be equipped by the set's job, sorted by item level. Higher-level gear is included for planning ahead.
+4. Select a result, fill other slots, then click **Save set**. **Clear** empties a slot; **Cancel** discards the draft. Empty sets can also be saved and filled later.
+
+Use **Edit set** to change or rename a local set, or click an item name directly in the checklist to open its slot search. **Edit local copy** on an imported set creates an independent custom copy; refreshing the original XIVGear link cannot overwrite it. Local sets participate in ownership and missing-loot checks immediately after saving.
+
+Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces have no specified materia target; unchanged imported-copy pieces retain their meld plans. Materia-plan editing is not part of this editor.
+
 ## Features and scope
 
 - Import individual sets or multi-set sheets and choose between saved sets.
+- Create, rename and edit local sets with a slot/job-filtered gear search; edit imported sets as independent local copies.
 - Display only sets whose imported job matches the active class/job. Bard targets appear on Bard, not Archer.
 - Count equipped items, inventory bags, and Armoury Chest items on the current character. Refresh approximately once per second while open.
 - Show a location for matching gear and require separate physical copies for duplicate target items.
@@ -50,7 +62,7 @@ These are last-known contents, not a remote live inventory. Reopen storage after
 
 After updating from 0.1.0, click **Refresh from link** on existing sets to load their materia targets. Old saved sets remain available and show unknown materia until refreshed. An explicitly empty target expects an unmelded item; extra materia is shown as a mismatch.
 
-Compilation, importer checks, inventory/materia matching, loot rules, saved-storage replacement/persistence/character isolation, and the supplied live XIVGear URL have been verified. Native storage reads and transfers, in-game loading, inventory/job transitions, and the loot glow's alignment, clipping and appearance still require manual verification.
+Compilation, editor search/draft rules, importer checks, inventory/materia matching, loot rules, saved-storage replacement/persistence/character isolation, and the supplied live XIVGear URL have been verified. The editor UI, native storage reads and transfers, in-game loading, inventory/job transitions, and loot indicator appearance still require manual verification.
 
 ## Build and test
 

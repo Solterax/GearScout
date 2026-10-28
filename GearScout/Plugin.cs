@@ -25,6 +25,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly WindowSystem windows = new("GearScout");
     private readonly MainWindow window;
+    private readonly SetEditorWindow setEditor;
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
     private readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
@@ -46,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     internal bool MessageIsError { get; private set; }
     internal ulong CharacterId => characterId;
     internal string StorageStatus { get; private set; } = "Open each storage location in game to save its contents.";
+    internal GearCatalog Catalog { get; }
 
     public Plugin()
     {
@@ -58,9 +60,12 @@ public sealed class Plugin : IDalamudPlugin
             storageSavePending = true;
         }
         window = new MainWindow(this);
+        Catalog = new GearCatalog(Data);
+        setEditor = new SetEditorWindow(this);
         lootHighlighter = new LootHighlighter(this);
         lootHighlighter.Initialize();
         windows.AddWindow(window);
+        windows.AddWindow(setEditor);
         Commands.AddHandler("/gearscout", new CommandInfo(OnCommand) { HelpMessage = "Open XIVGear gear tracking." });
         PluginInterface.UiBuilder.Draw += windows.Draw;
         PluginInterface.UiBuilder.Draw += lootHighlighter.Draw;
@@ -71,6 +76,27 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args) => Open();
     private void Open() => window.IsOpen = true;
+    internal void CreateSet() { if (!string.IsNullOrEmpty(CurrentJob)) setEditor.Create(CurrentJob); }
+    internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
+
+    internal void SaveLocalSet(TrackedSet set)
+    {
+        if (string.IsNullOrWhiteSpace(set.Name) || GearSearch.JobBit(set.Job) == 0)
+            throw new ArgumentException("Give the set a name and a valid job.");
+        var oldSets = Config.Sets;
+        var hadSelection = Config.SelectedByJob.TryGetValue(set.Job, out var oldSelection);
+        set.SourceUrl = "";
+        Config.Sets = Config.Sets.Where(s => s.Id != set.Id).Append(set).ToList();
+        Config.SelectedByJob[set.Job] = set.Id;
+        try { Save(); }
+        catch
+        {
+            Config.Sets = oldSets;
+            if (hadSelection) Config.SelectedByJob[set.Job] = oldSelection;
+            else Config.SelectedByJob.Remove(set.Job);
+            throw;
+        }
+    }
 
     internal void RequestStorageScan()
     {
@@ -103,6 +129,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void Update(IFramework framework)
     {
+        Catalog.Update();
         // All configuration and game access stays on the framework thread.
         if (pendingImport is { IsCompleted: true })
         {
@@ -239,6 +266,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= Open;
         Commands.RemoveHandler("/gearscout");
         windows.RemoveAllWindows();
+        Catalog.Dispose();
         lifetime.Cancel();
         // Observe a cancelled/faulted in-flight request without blocking the game thread.
         if (pendingImport != null)

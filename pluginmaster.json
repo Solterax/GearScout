@@ -3,8 +3,8 @@
     "Author": "Solterax",
     "Name": "GearScout",
     "InternalName": "GearScout",
-    "AssemblyVersion": "0.5.2.0",
-    "Description": "Import XIVGear sets, check gear and materia, and highlight wanted missing loot. Includes live equipped gear, bags and Armoury Chest plus locally saved checks of retainers, the glamour dresser and armoire.",
+    "AssemblyVersion": "0.6.0.0",
+    "Description": "Build gear sets in game with slot and job filtered item search, or import XIVGear links. Check gear, materia and saved storage ownership, and highlight wanted missing loot.",
     "ApplicableVersion": "any",
     "Tags": [
       "gear",
@@ -21,8 +21,8 @@
     "RepoUrl": "https://github.com/Solterax/GearScout",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.5.2/GearScout-plugin.zip",
-    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.5.2/GearScout-plugin.zip",
-    "LastUpdate": "1793151034"
+    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.6.0/GearScout-plugin.zip",
+    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.6.0/GearScout-plugin.zip",
+    "LastUpdate": "1793154895"
   }
 ]

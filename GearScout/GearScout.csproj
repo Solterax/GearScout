@@ -1,11 +1,11 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.5.2</Version>
+    <Version>0.6.0</Version>
     <Author>Solterax</Author>
     <RepoUrl>https://github.com/Solterax/GearScout</RepoUrl>
     <Name>GearScout</Name>
     <Punchline>Track your XIVGear sets for your current job.</Punchline>
-    <Description>Import XIVGear sets, check gear and materia, and highlight wanted missing loot. Includes live equipped gear, bags and Armoury Chest plus locally saved checks of retainers, the glamour dresser and armoire.</Description>
+    <Description>Build gear sets in game with slot and job filtered item search, or import XIVGear links. Check gear, materia and saved storage ownership, and highlight wanted missing loot.</Description>
     <Tags>gear;xivgear;inventory</Tags>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

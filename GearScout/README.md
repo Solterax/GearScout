@@ -1,4 +1,4 @@
-# GearScout 0.5.2
+# GearScout 0.6.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -11,6 +11,10 @@ A first version of a Dalamud plugin for importing XIVGear gear sets and checking
 5. Enter `/gearscout`, paste your XIVGear link, and click **Import**.
 
 Example link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
+
+To build a local set, click **New set**, enter a name, and click any slot in the editor. Search by name or ID, select a compatible piece, and click **Save set**. The job is captured when the set is created; current character level does not restrict planning. Existing local sets can be renamed or edited with **Edit set**; clicking a checklist item opens the editor at that slot. Imported sets open as independent local copies so a link refresh does not overwrite custom edits. Cancel and window close discard the draft. Empty sets can be saved.
+
+Search is backed by local Item, EquipSlotCategory and ClassJobCategory game sheets. Results fit the set's job/slot, sort by item level, and support both ring slots. A unique ring already selected in the opposite slot is disabled. Off-hand slots may have no results for some jobs. New/changed pieces have unspecified materia targets; the editor does not edit meld plans. Local sets integrate with saved ownership and loot checks but do not equip gear or modify the game's character gearsets.
 
 Switch to Bard to see this example. When you switch jobs, only sets whose imported job exactly matches your active class/job appear. Bard sets do not appear on Archer. A sheet containing multiple sets imports each set; use the dropdown to switch between them. Selected-set parameters in links are passed to XIVGear's API. Reimporting the same URL refreshes its saved sets instead of duplicating them. Sets and selection are saved in Dalamud's normal plugin configuration.
 
@@ -54,7 +58,7 @@ dotnet run --project Tests/GearScout.Tests.csproj -- --live
 
 ## Validation status
 
-Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, materia, loot rules, saved-storage replacement, serialization, character separation, cached ownership and invalid scans. The supplied Bard URL has also been tested against the live API. Native storage readiness/reads/transfers, in-game loading and glow appearance still need manual verification; compilation does not prove those behaviours.
+Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover editor filtering, search, unique rings, draft isolation, serialization, imports, materia, loot rules and storage checks. Native text formatting is checked separately. The supplied Bard URL has also been tested against the live API. The editor UI, native storage readiness/reads/transfers, in-game loading and indicator appearance still need manual verification; compilation does not prove those behaviours.
 
 Manual acceptance checks:
 
@@ -78,6 +82,9 @@ Manual acceptance checks:
 18. Move target gear between a retainer/dresser/armoire and player bags while the storage stays open. Verify refreshed snapshots remove withdrawn items and combine with live bags without persisting duplicate copies. Leave a source empty and verify the old saved items are removed.
 19. Check cached retainer materia and a dresser/armoire unmelded target. Hover the location to see last-checked time. Forget a closed source and verify its gear no longer contributes. Check loot-glow suppression for a wanted item held only in saved storage.
 20. Select wanted missing loot and verify its native item name is blue and the icon has a blue **!** badge. Select a non-target/owned/rolled item and verify its name has the original game color. Test switching repeatedly between targets and non-targets, duplicate loot, localized names, UI scaling, disabling highlighting, closing/reopening the loot window and unloading GearScout with a target selected.
+21. Click New set on Bard, name it and click Head. Verify the search box receives focus, Warrior-only hats and body pieces are excluded, partial words/item IDs work, and future-level gear is included. Choose items in several slots, clear one, save and reload. Verify set identity, name and pieces persist.
+22. Click a local checklist item and change it through the preselected slot search. Cancel and verify the original is unchanged; save and verify ownership and loot targets use the replacement. Try the same unique ring in both slots and verify it is blocked; non-unique duplicate rings should work.
+23. Edit an imported set, save its local copy, and refresh the original link. Verify the custom copy survives unchanged. Switch jobs while an editor is open and verify its job remains the original one. Save an empty set, rename it and later fill its slots.
 
 ## Implementation and references
 
@@ -86,6 +93,8 @@ Manual acceptance checks:
 `LootMatcher.cs` implements job scope, item-ID normalization and conservative roll-eligibility matching. `LootHighlighter.cs` reads the current NeedGreed list and live loot slots on each draw, finds visible item-icon bounds and draws the soft blue ImGui outline and punctuation badge without adding input handlers. A NeedGreed PreDraw listener colors exact, localized matching name text. `LootNameFormatting.cs` removes inline rarity foreground/glow payloads so they cannot override the blue base color, retaining other payloads. It calls native SetText to invalidate the layout cache. Original encoded text and colors restore through traversal of currently live nodes, only when those fields still match GearScout's applied values. PreFinalize and disposal restore remaining fields and unregister listeners. The icon overlays share ImGui's foreground layering relative to native windows. Native name coloring and badge appearance still need live visual verification.
 
 `StorageScanner.cs` reads only manually opened, loaded sources after a short stabilization delay; retainer identity must agree with ItemOrderModule and every container in a snapshot must be loaded. Dresser reads use the complete agent item array after population, and armoire reads require loaded Cabinet state. No requests, withdrawal actions or hooks are sent to the game. `StorageCache.cs` replaces complete source snapshots and combines them with live inventory for the current character. Native data unavailable at a location leaves its previous saved snapshot unchanged. Changed checks save immediately; unchanged timestamps refresh at most every 30 seconds. Save failures retry and are surfaced in the storage status.
+
+`GearCatalog.cs` indexes local game rows in small framework-thread batches. `GearSearch.cs` implements job/slot filters, ranked token/ID searches, ring constraints and independent edit drafts. `SetEditorWindow.cs` draws slot buttons and the searchable picker; search results are cached per query and clipped for long lists. Local saves replace a set by ID and roll back in-memory changes if persistence fails. Local sets have an empty SourceUrl, so XIVGear refresh operations do not replace them.
 
 - XIVGear API: https://github.com/xiv-gear-planner/gear-planner/blob/main/API_DOC.md
 - Dalamud plugin development: https://dalamud.dev/plugin-development/getting-started/
