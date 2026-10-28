@@ -4,14 +4,28 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using Bounds = FFXIVClientStructs.FFXIV.Common.Math.Bounds;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using FFXIVClientStructs.FFXIV.Client.Graphics;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Text.SeStringHandling;
 
 namespace GearScout;
 
-internal sealed unsafe class LootHighlighter(Plugin plugin)
+internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
 {
     private bool faulted;
+    private bool nameFaulted;
+    private nint coloredAddon;
+    private readonly Dictionary<nint, uint> originalTextColors = [];
+    private static readonly ByteColor NameBlue = new() { R = 88, G = 174, B = 255, A = 255 };
 
-    // Read native UI data afresh each draw. No node pointers survive the call and no game nodes are modified.
+    public void Initialize()
+    {
+        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreDraw, "NeedGreed", OnNativeDraw);
+        Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "NeedGreed", OnFinalize);
+    }
+
+    // Icon overlays retain no native pointers. Native name colors are restored through live-node traversal.
     public void Draw()
     {
         if (faulted || !plugin.Config.HighlightLoot || string.IsNullOrEmpty(plugin.CurrentJob) || Plugin.GameGui.GameUiHidden)
@@ -81,9 +95,128 @@ internal sealed unsafe class LootHighlighter(Plugin plugin)
                 }
                 draw.AddRect(min, max, ImGui.ColorConvertFloat4ToU32(new Vector4(0.32f, 0.67f, 1f, 0.55f)),
                     3f * scale, ImDrawFlags.None, 1.2f * scale);
+                DrawWantedBadge(draw, max.X, min.Y, scale);
             }
         }
         finally { draw.PopClipRect(); }
+    }
+
+    private static void DrawWantedBadge(ImDrawListPtr draw, float right, float top, float scale)
+    {
+        var center = new Vector2(right - 8 * scale, top + 8 * scale);
+        var blue = ImGui.ColorConvertFloat4ToU32(new Vector4(0.35f, 0.72f, 1f, 1));
+        draw.AddCircleFilled(center, 7 * scale, ImGui.ColorConvertFloat4ToU32(new Vector4(0.025f, 0.07f, 0.14f, 0.96f)));
+        draw.AddCircle(center, 7 * scale, blue, 0, 1.25f * scale);
+        // Draw punctuation as geometry so the badge scales with the native icon, not the plugin font.
+        draw.AddLine(center + new Vector2(0, -4 * scale), center + new Vector2(0, 1 * scale), blue, 2.2f * scale);
+        draw.AddCircleFilled(center + new Vector2(0, 4 * scale), 1.2f * scale, blue);
+    }
+
+    private void OnNativeDraw(AddonEvent type, AddonArgs args)
+    {
+        var addon = args.GetAddonPointer<AddonNeedGreed>();
+        if (addon == null) return;
+        try
+        {
+            RestoreNames(addon);
+            if (nameFaulted || !plugin.Config.HighlightLoot || string.IsNullOrEmpty(plugin.CurrentJob) ||
+                Plugin.GameGui.GameUiHidden || !addon->IsVisible) return;
+            var loot = Loot.Instance();
+            if (loot == null) return;
+            var targets = LootMatcher.MissingItems(plugin.Config.Sets, plugin.CurrentJob,
+                plugin.Config.LootCurrentJobOnly, plugin.Owned);
+            if (targets.Count == 0) return;
+            var rolls = new List<LootRollEntry>(loot->Items.Length);
+            foreach (ref readonly var entry in loot->Items)
+                rolls.Add(new(entry.ItemId, (entry.RollState is RollState.UpToNeed or RollState.UpToGreed) &&
+                    entry.RollResult == RollResult.UnAwarded && entry.Time > 0));
+            coloredAddon = (nint)addon;
+            var selected = addon->SelectedItemIndex;
+            if (selected >= 0 && selected < addon->Items.Length &&
+                LootMatcher.CanHighlight(addon->Items[selected].ItemId, selected, rolls, targets))
+                TintNames(&addon->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[selected].ItemId)), false);
+
+            var node = addon->GetNodeById(6);
+            if (node == null) return;
+            var list = node->GetAsAtkComponentList();
+            if (list == null) return;
+            var count = Math.Clamp(list->GetItemCount(), 0, addon->Items.Length);
+            for (var index = 0; index < count; index++)
+            {
+                if (!LootMatcher.CanHighlight(addon->Items[index].ItemId, index, rolls, targets)) continue;
+                var renderer = list->GetItemRenderer(index);
+                if (renderer == null || renderer->ListItemIndex != index) continue;
+                TintNames(&renderer->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[index].ItemId)), true);
+            }
+        }
+        catch (Exception ex)
+        {
+            nameFaulted = true;
+            Plugin.Log.Warning(ex, "Loot name coloring disabled until GearScout is reloaded");
+            RestoreNames(addon);
+        }
+    }
+
+    private void TintNames(AtkUldManager* manager, string expectedName, bool recurse)
+    {
+        var nodes = new List<nint>();
+        CollectTextNodes(manager, nodes, [], recurse);
+        foreach (var address in nodes)
+        {
+            var text = (AtkTextNode*)address;
+            if (!Visible((AtkResNode*)text) ||
+                !string.Equals(SeString.Parse(text->NodeText.AsSpan()).TextValue.Trim(), expectedName.Trim(), StringComparison.Ordinal)) continue;
+            originalTextColors.TryAdd(address, text->TextColor.RGBA);
+            text->TextColor = NameBlue;
+            text->IsDirty = true;
+        }
+    }
+
+    private void RestoreNames(AddonNeedGreed* addon)
+    {
+        if (originalTextColors.Count == 0) return;
+        if ((nint)addon == coloredAddon)
+        {
+            var nodes = new List<nint>();
+            CollectTextNodes(&addon->UldManager, nodes, [], true);
+            foreach (var address in nodes)
+            {
+                var text = (AtkTextNode*)address;
+                // Only dereference currently live nodes, and only restore colors still owned by GearScout.
+                if (!originalTextColors.TryGetValue(address, out var original) || text->TextColor.RGBA != NameBlue.RGBA) continue;
+                text->TextColor.RGBA = original;
+                text->IsDirty = true;
+            }
+        }
+        originalTextColors.Clear();
+        coloredAddon = 0;
+    }
+
+    private static void CollectTextNodes(AtkUldManager* manager, List<nint> texts, HashSet<nint> visited, bool recurse, int depth = 0)
+    {
+        if (manager == null || manager->NodeList == null || manager->NodeListCount > 4096 || depth > 8) return;
+        for (var index = 0; index < manager->NodeListCount && visited.Count < 4096; index++)
+        {
+            var node = manager->NodeList[index];
+            if (node == null || !visited.Add((nint)node)) continue;
+            if (node->Type == NodeType.Text) texts.Add((nint)node);
+            else if (recurse && (int)node->Type >= 1000)
+            {
+                var component = node->GetComponent();
+                if (component != null) CollectTextNodes(&component->UldManager, texts, visited, true, depth + 1);
+            }
+        }
+    }
+
+    private void OnFinalize(AddonEvent type, AddonArgs args) => RestoreNames(args.GetAddonPointer<AddonNeedGreed>());
+
+    public void Dispose()
+    {
+        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PreDraw, "NeedGreed", OnNativeDraw);
+        Plugin.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "NeedGreed", OnFinalize);
+        var addon = Plugin.GameGui.GetAddonByName<AddonNeedGreed>("NeedGreed");
+        if (addon != null) RestoreNames(addon);
+        originalTextColors.Clear();
     }
 
     private static AtkResNode* IconNode(AtkComponentListItemRenderer* renderer)
