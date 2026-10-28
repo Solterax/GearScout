@@ -7,7 +7,6 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
-using Dalamud.Game.Text.SeStringHandling;
 
 namespace GearScout;
 
@@ -16,8 +15,9 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
     private bool faulted;
     private bool nameFaulted;
     private nint coloredAddon;
-    private readonly Dictionary<nint, uint> originalTextColors = [];
+    private readonly Dictionary<nint, NameStyle> originalTextColors = [];
     private static readonly ByteColor NameBlue = new() { R = 88, G = 174, B = 255, A = 255 };
+    private sealed record NameStyle(uint Color, byte[] OriginalText, byte[] AppliedText);
 
     public void Initialize()
     {
@@ -103,6 +103,7 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
 
     private static void DrawWantedBadge(ImDrawListPtr draw, float right, float top, float scale)
     {
+        scale *= 1.5f;
         var center = new Vector2(right - 8 * scale, top + 8 * scale);
         var blue = ImGui.ColorConvertFloat4ToU32(new Vector4(0.35f, 0.72f, 1f, 1));
         draw.AddCircleFilled(center, 7 * scale, ImGui.ColorConvertFloat4ToU32(new Vector4(0.025f, 0.07f, 0.14f, 0.96f)));
@@ -131,22 +132,34 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
                 rolls.Add(new(entry.ItemId, (entry.RollState is RollState.UpToNeed or RollState.UpToGreed) &&
                     entry.RollResult == RollResult.UnAwarded && entry.Time > 0));
             coloredAddon = (nint)addon;
-            var selected = addon->SelectedItemIndex;
-            if (selected >= 0 && selected < addon->Items.Length &&
-                LootMatcher.CanHighlight(addon->Items[selected].ItemId, selected, rolls, targets))
-                TintNames(&addon->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[selected].ItemId)), false);
-
             var node = addon->GetNodeById(6);
-            if (node == null) return;
-            var list = node->GetAsAtkComponentList();
-            if (list == null) return;
-            var count = Math.Clamp(list->GetItemCount(), 0, addon->Items.Length);
+            var list = node == null ? null : node->GetAsAtkComponentList();
+            var count = list == null ? 0 : Math.Clamp(list->GetItemCount(), 0, addon->Items.Length);
+            var rowOwners = new HashSet<nint>();
+            for (var index = 0; index < count; index++)
+            {
+                var renderer = list->GetItemRenderer(index);
+                if (renderer != null && renderer->OwnerNode != null) rowOwners.Add((nint)renderer->OwnerNode);
+            }
+            var selected = addon->SelectedItemIndex;
+            if (selected >= 0 && selected < addon->Items.Length && addon->Items[selected].ItemId != 0)
+            {
+                if (LootMatcher.CanHighlight(addon->Items[selected].ItemId, selected, rolls, targets))
+                    TintNames(&addon->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[selected].ItemId)), rowOwners);
+            }
+            else
+            {
+                // Some layouts show a preview name before assigning SelectedItemIndex.
+                for (var index = 0; index < addon->Items.Length; index++)
+                    if (LootMatcher.CanHighlight(addon->Items[index].ItemId, index, rolls, targets))
+                        TintNames(&addon->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[index].ItemId)), rowOwners);
+            }
             for (var index = 0; index < count; index++)
             {
                 if (!LootMatcher.CanHighlight(addon->Items[index].ItemId, index, rolls, targets)) continue;
                 var renderer = list->GetItemRenderer(index);
                 if (renderer == null || renderer->ListItemIndex != index) continue;
-                TintNames(&renderer->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[index].ItemId)), true);
+                TintNames(&renderer->UldManager, plugin.ItemName(LootMatcher.BaseItemId(addon->Items[index].ItemId)));
             }
         }
         catch (Exception ex)
@@ -157,19 +170,30 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
         }
     }
 
-    private void TintNames(AtkUldManager* manager, string expectedName, bool recurse)
+    private void TintNames(AtkUldManager* manager, string expectedName, HashSet<nint>? excludedParents = null)
     {
         var nodes = new List<nint>();
-        CollectTextNodes(manager, nodes, [], recurse);
+        CollectTextNodes(manager, nodes, [], true);
         foreach (var address in nodes)
         {
             var text = (AtkTextNode*)address;
-            if (!Visible((AtkResNode*)text) ||
-                !string.Equals(SeString.Parse(text->NodeText.AsSpan()).TextValue.Trim(), expectedName.Trim(), StringComparison.Ordinal)) continue;
-            originalTextColors.TryAdd(address, text->TextColor.RGBA);
+            if (!Visible((AtkResNode*)text) || InsideExcludedParent((AtkResNode*)text, excludedParents)) continue;
+            var original = text->NodeText.AsSpan().ToArray();
+            var applied = LootNameFormatting.ForBlueName(original, expectedName);
+            if (applied == null) continue;
+            originalTextColors.TryAdd(address, new(text->TextColor.RGBA, original, applied));
             text->TextColor = NameBlue;
+            text->SetText(applied.Append((byte)0).ToArray()); // Also invalidates the native text layout cache.
             text->IsDirty = true;
         }
+    }
+
+    private static bool InsideExcludedParent(AtkResNode* node, HashSet<nint>? excluded)
+    {
+        if (excluded == null || excluded.Count == 0) return false;
+        for (var depth = 0; node != null && depth < 64; node = node->ParentNode, depth++)
+            if (excluded.Contains((nint)node)) return true;
+        return false;
     }
 
     private void RestoreNames(AddonNeedGreed* addon)
@@ -183,8 +207,10 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
             {
                 var text = (AtkTextNode*)address;
                 // Only dereference currently live nodes, and only restore colors still owned by GearScout.
-                if (!originalTextColors.TryGetValue(address, out var original) || text->TextColor.RGBA != NameBlue.RGBA) continue;
-                text->TextColor.RGBA = original;
+                if (!originalTextColors.TryGetValue(address, out var original)) continue;
+                if (text->NodeText.AsSpan().SequenceEqual(original.AppliedText))
+                    text->SetText(original.OriginalText.Append((byte)0).ToArray());
+                if (text->TextColor.RGBA == NameBlue.RGBA) text->TextColor.RGBA = original.Color;
                 text->IsDirty = true;
             }
         }

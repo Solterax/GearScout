@@ -8,6 +8,8 @@ if ($Repository -notmatch '^[A-Za-z0-9-]+/[A-Za-z0-9_.-]+$') { throw 'Repository
 & (Join-Path $PSScriptRoot 'GearScout\build.ps1')
 & dotnet run --project (Join-Path $PSScriptRoot 'GearScout\Tests\GearScout.Tests.csproj')
 if ($LASTEXITCODE -ne 0) { throw 'Importer and matching checks failed.' }
+& dotnet run --project (Join-Path $PSScriptRoot 'NativeTextChecks\NativeTextChecks.csproj')
+if ($LASTEXITCODE -ne 0) { throw 'Native name-formatting checks failed.' }
 
 $buildPath = Join-Path $PSScriptRoot 'GearScout\bin\Release'
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $buildPath 'GearScout.json') | ConvertFrom-Json

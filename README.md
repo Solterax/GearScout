@@ -59,6 +59,8 @@ Requires .NET 10 SDK and Dalamud API 15 assemblies installed by XIVLauncher.
 ```powershell
 .\GearScout\build.ps1
 dotnet run --project .\GearScout\Tests\GearScout.Tests.csproj
+# Native SeString formatting regression checks (run the build first to locate Dalamud):
+dotnet run --project .\NativeTextChecks\NativeTextChecks.csproj
 # Optional live API check:
 dotnet run --project .\GearScout\Tests\GearScout.Tests.csproj -- --live
 ```
@@ -72,7 +74,7 @@ The build script locates Dalamud automatically, or uses `DALAMUD_HOME` if set. S
 3. Commit the source changes and generated index, then push to `main`.
 4. Create a GitHub release with the matching version tag (for example `v0.1.1`) and upload `artifacts/GearScout-plugin.zip` as its release asset. Keep the asset name unchanged.
 
-The index and release must use the same assembly version. The script prepares local files; it does not publish to GitHub itself. New releases still require verification against the current game/Dalamud version.
+The index and release must use the same assembly version. The script runs the matching and native name-formatting checks, prepares local files and does not publish to GitHub itself. New releases still require verification against the current game/Dalamud version.
 
 ## Development disclosure
 
