@@ -1,4 +1,4 @@
-# GearScout 0.7.0
+# GearScout 0.7.1
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 

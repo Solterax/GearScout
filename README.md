@@ -27,6 +27,8 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 
 Use **Edit set** to change or rename a local set, or click an item name directly in the checklist to open its slot search. **Edit local copy** on an imported set creates an independent custom copy; refreshing the original XIVGear link cannot overwrite it. Local sets participate in ownership and missing-loot checks immediately after saving.
 
+The builder and search popup have fixed dimensions; scrolling stays inside their item lists.
+
 Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces have no specified materia target; unchanged imported-copy pieces retain their meld plans. Materia-plan editing is not part of this editor.
 
 ## Build a job-independent glam set

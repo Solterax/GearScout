@@ -4,8 +4,11 @@ using Dalamud.Interface.Windowing;
 
 namespace GearScout;
 
-internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###GearScoutEditor")
+internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###GearScoutEditor",
+    ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)
 {
+    private static readonly Vector2 EditorSize = new(760, 630);
+    private static readonly Vector2 PickerSize = new(680, 440);
     private TrackedSet? draft;
     private string name = "";
     private string slot = "";
@@ -35,9 +38,9 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
         lastSearch = null;
         openPicker = initialSlot != null;
         IsOpen = true;
-        Size = new Vector2(760, 630);
-        SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new WindowSizeConstraints { MinimumSize = new Vector2(560, 420), MaximumSize = new Vector2(float.MaxValue) };
+        Size = EditorSize;
+        SizeCondition = ImGuiCond.Always;
+        SizeConstraints = new WindowSizeConstraints { MinimumSize = EditorSize, MaximumSize = EditorSize };
     }
 
     public override void Draw()
@@ -95,8 +98,9 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
 
     private void DrawPicker()
     {
-        ImGui.SetNextWindowSize(new Vector2(680, 440), ImGuiCond.Appearing);
-        if (!ImGui.BeginPopup("Find gear")) return;
+        ImGui.SetNextWindowSize(PickerSize, ImGuiCond.Always);
+        ImGui.SetNextWindowSizeConstraints(PickerSize, PickerSize);
+        if (!ImGui.BeginPopup("Find gear", ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse)) return;
         ImGui.TextUnformatted($"{(draft!.IsGlam ? "Glam — all jobs" : draft.Job)} / {GearSearch.SlotName(slot)}");
         if (focusSearch) { ImGui.SetKeyboardFocusHere(); focusSearch = false; }
         ImGui.SetNextItemWidth(-1);
