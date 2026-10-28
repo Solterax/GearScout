@@ -80,7 +80,11 @@ var lootSets = new[]
 var bardTargets = LootMatcher.TargetItems(lootSets, "BRD", true);
 Check(bardTargets.SetEquals(new uint[] { 10, 20 }), "Loot checks every saved set for the current job");
 Check(LootMatcher.TargetItems(lootSets, "BRD", false).Contains(30), "Optional loot scope includes other jobs");
-Check(!bardTargets.Contains(30), "Default loot scope excludes other jobs");
+var farmingSets = new[] { new TrackedSet { Job = "WAR", Pieces = [new() { ItemId = 20871 }] } };
+var farmingTargets = LootMatcher.MissingItems(farmingSets, "BLM", false, []);
+Check(LootMatcher.CanHighlight(20871, 0, [new(20871, true)], farmingTargets), "Skallic Amulet of Fending can glow while farming Warrior gear on Black Mage");
+Check(!LootMatcher.CanHighlight(20871, 0, [new(20871, true)], LootMatcher.MissingItems(farmingSets, "BLM", false, [new(20871, 1, "Bag", false)])), "Other-job loot still stays unlit when already owned");
+Check(!bardTargets.Contains(30), "Current-job-only option excludes other jobs");
 Check(LootMatcher.TargetItems(lootSets, "brd", true).SetEquals(bardTargets), "Loot job matching ignores case");
 Check(LootMatcher.CanHighlight(10, 0, [new(10, true)], bardTargets), "Eligible target loot highlighted");
 Check(LootMatcher.CanHighlight(1_000_010, 0, [new(10, true)], bardTargets), "HQ loot normalized to imported base item ID");

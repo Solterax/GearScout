@@ -43,7 +43,8 @@ internal sealed class MainWindow : Window
             SaveSafely();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Highlights items still missing from a saved set for this job.\nIncludes saved retainer, dresser and armoire checks for this character.\nAn owned copy counts regardless of melds. Untick to include other jobs.\nCoffers and exchange tokens are not mapped.");
+            ImGui.SetTooltip("Leave unticked to highlight missing items for ALL saved jobs, including gear you can only Greed.\nTick to restrict loot highlights to the job you are playing.\nIncludes saved retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
+        ImGui.TextColored(Muted, currentJobOnly ? "Loot checks: current job only" : "Loot checks: all saved jobs (including other jobs' gear)");
         DrawStorage();
         ImGui.Spacing();
         ImGui.SetNextItemWidth(-95);

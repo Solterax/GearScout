@@ -28,7 +28,9 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 - Prefer correctly melded owned copies when duplicate gear exists. Use **Needs work only** to include both missing gear and incorrect or unknown melds.
 - Save target sets and per-job selection across sessions. Reimporting the same link refreshes its saved sets.
 - Save per-character checks of retainer bags/equipped gear, the glamour dresser (including expanded outfit pieces), and the armoire. Saved items count as owned after those windows close and across plugin/game restarts.
-- Subtle blue glow around wanted, missing item icons in the game's standard loot-roll window, even while the checklist is closed. Enabled by default for every saved set of the current job; untick **Loot: current job only** to include other jobs. Disable with **Blue glow on missing set items**.
+- Subtle blue glow around wanted, missing item icons in the game's standard loot-roll window, even while the checklist is closed. Checks **all saved jobs by default**, so farming another job's gear while playing your main job still works. Tick **Loot: current job only** to restrict it. Disable with **Blue glow on missing set items**.
+
+Version 0.4.1 switches older configurations to all-job loot checking once. You can re-enable the current-job-only option afterward. The checklist selector still shows only the job you are playing; loot scope is independent of that selector.
 
 The loot glow appears only for items required by a saved set and missing from live inventory and the current character's saved storage checks. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown live inventory suppresses the glow.
 

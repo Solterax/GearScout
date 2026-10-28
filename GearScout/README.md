@@ -1,4 +1,4 @@
-# GearScout 0.4.0
+# GearScout 0.4.1
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -24,7 +24,7 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 - Materia is compared by item ID (type and grade), with duplicates counted separately. Order does not matter, and all five meld slots are checked. Exact matches require no missing or extra materia.
 - Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
 - Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
-- Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved sets for the current job are checked, even when the checklist is closed. Use the loot settings to disable it or include other jobs.
+- Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved jobs are checked by default, even when farming other jobs' gear with Greed and when the checklist is closed. The current-job-only loot option is available as an explicit restriction. Version 0.4.1 switches older configurations to all-job loot scope once; the checklist's job filtering is unchanged.
 - The glow requires an item to be wanted by a saved set and missing from live inventory and the character's saved storage checks. Owned gear suppresses it regardless of materia; a set needing two identical rings still requires two copies, while alternative saved sets can reuse one owned copy. Ownership refreshes once per second with the checklist closed while highlighting is enabled. Unknown live inventory suppresses the glow.
 - It is shown only for available Need/Greed rolls, and does not automate rolling. Coffers and exchange tokens are not mapped to their rewards.
 - Manually open each retainer inventory, the glamour dresser and the armoire, then wait for loading. Complete contents save automatically, even with the checklist closed. **Saved storage checks** shows per-source timestamps and provides **Scan open storage** and **Forget** controls. Retainer bags and equipped gear are independent sources; selling/market listings are excluded. Dresser data includes expanded outfit pieces; glamour plates are not physical ownership.
