@@ -30,7 +30,7 @@ internal sealed class MainWindow : Window
         ImGui.TextUnformatted("XIVGEAR  /  GEAR CHECKLIST");
         ImGui.TextColored(Muted, "Equipped gear + bags + Armoury Chest. Updates every second.");
         var highlightLoot = plugin.Config.HighlightLoot;
-        if (ImGui.Checkbox("Blue glow on loot in saved sets", ref highlightLoot))
+        if (ImGui.Checkbox("Blue glow on missing set items", ref highlightLoot))
         {
             plugin.Config.HighlightLoot = highlightLoot;
             SaveSafely();
@@ -43,7 +43,7 @@ internal sealed class MainWindow : Window
             SaveSafely();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Highlights exact gear item matches in every saved set for this job.\nUntick to include other jobs. Coffers and exchange tokens are not mapped.");
+            ImGui.SetTooltip("Highlights items still missing from a saved set for this job.\nChecks equipped gear, bags and Armoury Chest. An owned copy counts regardless of melds.\nUntick to include other jobs. Coffers and exchange tokens are not mapped.");
         ImGui.Spacing();
         ImGui.SetNextItemWidth(-95);
         ImGui.InputTextWithHint("##link", "Paste an xivgear.app gear set or sheet link", ref link, 4096);

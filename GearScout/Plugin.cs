@@ -113,7 +113,13 @@ public sealed class Plugin : IDalamudPlugin
             Owned = null;
             nextScan = Environment.TickCount64 + 500;
         }
-        if (!ready || !window.IsOpen || Environment.TickCount64 < nextScan) return;
+        // Loot highlighting needs fresh ownership even when the checklist is closed.
+        if (!window.IsOpen && !Config.HighlightLoot)
+        {
+            Owned = null;
+            return;
+        }
+        if (!ready || Environment.TickCount64 < nextScan) return;
         nextScan = Environment.TickCount64 + 1000;
         try { Owned = InventoryReader.Read(Inventory, Data); }
         catch (Exception ex)

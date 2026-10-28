@@ -1,4 +1,4 @@
-# GearScout 0.3.0
+# GearScout 0.3.1
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -25,7 +25,8 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 - Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
 - Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
 - Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved sets for the current job are checked, even when the checklist is closed. Use the loot settings to disable it or include other jobs.
-- The glow indicates saved-set membership, irrespective of ownership or materia. It is shown only for available Need/Greed rolls, and does not automate rolling. Coffers and exchange tokens are not mapped to their rewards.
+- The glow requires an item to be wanted by a saved set and missing from equipped gear, bags and Armoury Chest. Owned gear suppresses it regardless of materia; a set needing two identical rings still requires two copies, while alternative saved sets can reuse one owned copy. Ownership refreshes once per second with the checklist closed while highlighting is enabled. Unknown inventory suppresses the glow.
+- It is shown only for available Need/Greed rolls, and does not automate rolling. Coffers and exchange tokens are not mapped to their rewards.
 - Retainers, chocobo saddlebags, glamour dresser, armoire and other characters are excluded. An item in those places can appear as missing. Move it to your bags or Armoury Chest to have it counted.
 - Custom/negative XIVGear item IDs are unsupported. Invalid imports report an error and leave the previous saved sets intact.
 - Saved target sets are shared by the plugin configuration; ownership is always read from the current character and is never persisted.
@@ -68,6 +69,7 @@ Manual acceptance checks:
 12. Roll, pass or let the matching drop resolve and verify the glow clears. Test duplicate loot slots with one rolled and one still eligible, and scroll a list longer than the visible area.
 13. Move and rescale the loot window; check glow alignment and clipping. Hide the game UI and close the loot window to confirm no stale glow remains. Verify mouse and controller loot controls work normally.
 14. Disable the glow, include other jobs, remove a target set and change jobs; verify the highlighted items follow the settings immediately. Unload the plugin while the loot window is open and confirm no highlight remains.
+15. With the checklist closed, verify an owned wanted item does not glow. Move it out of checked storage and verify the glow appears after the ownership refresh; return it and verify it clears. Wrong melds on an owned copy must not trigger a glow. Test a two-identical-ring target with one and then two owned copies.
 
 ## Implementation and references
 

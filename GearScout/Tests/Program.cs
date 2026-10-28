@@ -94,6 +94,24 @@ Check(!LootMatcher.CanHighlight(10, 0, [new(10, false), new(10, true)], bardTarg
 Check(!LootMatcher.CanHighlight(10, 0, [], bardTargets), "No live roll data means no glow");
 Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], LootMatcher.TargetItems([], "BRD", true)), "Removing a saved target removes its loot highlight");
 
+var missingTargets = LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 1, "Equipped", true)]);
+Check(missingTargets.SetEquals(new uint[] { 20 }), "Owned gear excluded while wanted missing gear remains eligible");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], missingTargets), "Already owned wanted loot does not glow");
+Check(LootMatcher.CanHighlight(20, 0, [new(20, true)], missingTargets), "Wanted missing loot can glow");
+Check(LootMatcher.MissingItems(lootSets, "BRD", true, null).Count == 0, "Unknown inventory suppresses all loot glow");
+Check(LootMatcher.MissingItems(lootSets, "BRD", true, []).SetEquals(bardTargets), "Known empty inventory permits missing targets");
+foreach (var location in new[] { "Bag 1", "Armoury Chest", "Equipped" })
+    Check(!LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 1, location, location == "Equipped")]).Contains(10),
+        "Owned item in " + location + " suppresses loot glow");
+var twoRingSet = new TrackedSet { Job = "BRD", Pieces = rings.ToList() };
+Check(LootMatcher.MissingItems([twoRingSet], "BRD", true, [new(1, 1, "Equipped", true)]).Contains(1), "One ring still glows when the same set needs a second copy");
+Check(!LootMatcher.MissingItems([twoRingSet], "BRD", true, [new(1, 1, "Equipped", true), new(1, 1, "Bag", false)]).Contains(1), "Two owned copies suppress two-ring target glow");
+Check(!LootMatcher.MissingItems([lootSets[0], lootSets[0]], "BRD", true, [new(10, 1, "Bag", false)]).Contains(10), "Alternative saved sets share one owned copy instead of demanding duplicates");
+Check(LootMatcher.MissingItems(lootSets, "BRD", false, [new(10, 1, "Bag", false), new(20, 1, "Bag", false)]).SetEquals(new uint[] { 30 }), "All-jobs scope still excludes owned targets");
+Check(!LootMatcher.MissingItems([new TrackedSet { Job = "BRD", Pieces = [targetA] }], "BRD", true, [Copy([2])]).Contains(10), "Incorrect materia does not make an owned gear item missing");
+Check(LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 0, "Bag", false)]).Contains(10), "Zero-quantity inventory entry does not suppress missing loot");
+Check(!LootMatcher.MissingItems(lootSets, "BRD", true, [new(1_000_010, 1, "Bag", false)]).Contains(10), "Owned HQ item suppresses target glow");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
