@@ -100,6 +100,8 @@ Manual acceptance checks:
 
 `RetainerScanSession.cs` is a tested state machine for list → menu → loaded/saved inventory → menu → list. `RetainerScanController.cs` resolves available roster rows to stable retainer IDs, uses localized Addon-sheet menu labels, and issues only selection, inventory-open, inventory-hide and Quit navigation actions. The next retainer cannot start before the previous snapshot has persisted. Stop, character/loading changes, a 30-second phase timeout, unexpected dialogs and mismatched ready retainer identities stop further callbacks. Native navigation still needs in-game acceptance testing.
 
+`RetainerMenuMatching.cs` matches the literal localized prefix before a template's first dynamic macro, allowing the rendered slots-filled counter to change. Static labels such as Quit require an exact match; empty prefixes, missing entries and ambiguous matches are rejected. Native regression checks include the installed game's English Addon row 2378 bytes and the reported zero-slots menu.
+
 `GearCatalog.cs` indexes local game rows in small framework-thread batches. `GearSearch.cs` implements job/slot filters, ranked token/ID searches, ring constraints and independent edit drafts. `SetEditorWindow.cs` draws slot buttons and the searchable picker; search results are cached per query and clipped for long lists. Local saves replace a set by ID and roll back in-memory changes if persistence fails. Local sets have an empty SourceUrl, so XIVGear refresh operations do not replace them.
 
 - XIVGear API: https://github.com/xiv-gear-planner/gear-planner/blob/main/API_DOC.md

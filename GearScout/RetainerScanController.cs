@@ -103,20 +103,17 @@ internal sealed unsafe class RetainerScanController(Plugin plugin)
     {
         var addon = Plugin.GameGui.GetAddonByName<AddonSelectString>("SelectString");
         if (addon == null || !addon->IsVisible || !addon->IsReady) throw new InvalidOperationException("Retainer menu is not ready.");
-        var expected = Plugin.Data.GetExcelSheet<AddonRow>().GetRow(textRow).Text.ToString().Trim();
+        var template = Plugin.Data.GetExcelSheet<AddonRow>().GetRow(textRow).Text.Data.ToArray();
         var menu = &addon->PopupMenu.PopupMenu;
         if (menu->EntryNames == null || menu->EntryCount is < 1 or > 32) throw new InvalidOperationException("Unexpected retainer menu.");
-        for (var index = 0; index < menu->EntryCount; index++)
-        {
-            if (menu->EntryNames[index].Value == null) continue;
-            var text = SeString.Parse(menu->EntryNames[index].Value).TextValue.Trim();
-            if (!string.Equals(text, expected, StringComparison.Ordinal)) continue;
-            if (menu->List != null && menu->List->GetItemDisabledState(index)) throw new InvalidOperationException("Retainer menu entry is disabled.");
-            AtkValue value = new() { Type = AtkValueType.Int, Int = index };
-            addon->FireCallback(1, &value, true);
-            return;
-        }
-        throw new InvalidOperationException("The expected retainer inventory/quit menu entry was not found.");
+        var entries = new string[menu->EntryCount];
+        for (var i = 0; i < entries.Length; i++)
+            entries[i] = menu->EntryNames[i].Value == null ? "" : SeString.Parse(menu->EntryNames[i].Value).TextValue;
+        var index = RetainerMenuMatching.FindEntry(template, entries);
+        if (index < 0) throw new InvalidOperationException($"Retainer menu entry for Addon row {textRow} was missing or ambiguous.");
+        if (menu->List != null && menu->List->GetItemDisabledState(index)) throw new InvalidOperationException("Retainer menu entry is disabled.");
+        AtkValue value = new() { Type = AtkValueType.Int, Int = index };
+        addon->FireCallback(1, &value, true);
     }
 
     private static bool Open(string name) => Plugin.GameGui.GetAddonByName(name).IsReady && Plugin.GameGui.GetAddonByName(name).IsVisible;
