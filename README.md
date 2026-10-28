@@ -8,13 +8,15 @@ Build gear sets inside the game or import them from XIVGear. Switch between save
 2. Under **Experimental → Custom Plugin Repositories**, add and enable:
 
    ```text
-   https://raw.githubusercontent.com/Solterax/GearScout/main/pluginmaster.json
+   https://raw.githubusercontent.com/Solterax/DalamudPlugins/main/pluginmaster.json
    ```
 
 3. Save, open `/xlplugins`, and install **GearScout**.
 4. Open `/gearscout`, paste an XIVGear link, and click **Import**.
 
 If you already loaded GearScout as a development plugin, disable that copy before installing this one.
+
+The shared repository lists all Solterax plugins. The previous GearScout-specific repository URL continues to work. Existing users can replace it with the shared URL in Dalamud settings; GearScout's plugin identity and saved sets stay the same.
 
 Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 
@@ -99,8 +101,9 @@ The build script locates Dalamud automatically, or uses `DALAMUD_HOME` if set. S
 2. Run `./prepare-release.ps1`. This builds the plugin, runs the offline checks, creates `artifacts/GearScout-plugin.zip`, and regenerates `pluginmaster.json` from the compiled manifest.
 3. Commit the source changes and generated index, then push to `main`.
 4. Create a GitHub release with the matching version tag (for example `v0.1.1`) and upload `artifacts/GearScout-plugin.zip` as its release asset. Keep the asset name unchanged.
+5. Run `./refresh-shared-catalogue.ps1` to start the shared catalogue's GitHub Actions refresh. GitHub CLI must be signed in. Check the workflow at [DalamudPlugins Actions](https://github.com/Solterax/DalamudPlugins/actions/workflows/refresh.yml). The shared repository also checks its source feeds every 30 minutes, subject to GitHub scheduling delays.
 
-The index and release must use the same assembly version. The script runs the matching and native name-formatting checks, prepares local files and does not publish to GitHub itself. New releases still require verification against the current game/Dalamud version.
+The index and release must use the same assembly version. The preparation script runs the matching and native name-formatting checks, prepares local files and does not publish to GitHub itself. The GearScout index remains the source for its entry in [the shared catalogue](https://github.com/Solterax/DalamudPlugins); shared refreshes replace only matching plugin entries and preserve the others. Future plugins can keep separate source/release repositories and add their feed to the shared repository's `sources.json`. New releases still require verification against the current game/Dalamud version.
 
 ## Development disclosure
 

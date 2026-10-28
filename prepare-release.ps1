@@ -39,4 +39,6 @@ $manifest | Add-Member -Force -NotePropertyName LastUpdate -NotePropertyValue ([
 ConvertTo-Json -InputObject @($manifest) -Depth 10 | Set-Content -LiteralPath (Join-Path $PSScriptRoot 'pluginmaster.json') -Encoding utf8
 Write-Host "Release asset: $packagePath"
 Write-Host "Tag: $Tag"
-Write-Host "Dalamud repository: https://raw.githubusercontent.com/$Repository/main/pluginmaster.json"
+Write-Host 'Shared Dalamud repository: https://raw.githubusercontent.com/Solterax/DalamudPlugins/main/pluginmaster.json'
+Write-Host "Legacy GearScout feed: https://raw.githubusercontent.com/$Repository/main/pluginmaster.json"
+Write-Host 'After pushing the index and publishing the release asset, run ./refresh-shared-catalogue.ps1 to refresh the shared catalogue immediately.'
