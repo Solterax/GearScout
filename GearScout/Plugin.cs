@@ -25,12 +25,14 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static ICondition Condition { get; private set; } = null!;
     [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
     [PluginService] internal static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
+    [PluginService] internal static IChatGui Chat { get; private set; } = null!;
 
     private readonly WindowSystem windows = new("GearScout");
     private readonly MainWindow window;
     private readonly SetEditorWindow setEditor;
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
+    private readonly WantedItemTracker wantedItems = new();
     private readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<uint, string> itemNames = [];
@@ -43,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     private bool storageSavePending;
     private long storageRefreshUntil;
     private bool storageRefreshPending;
+    private long storageTransferUntil;
     private static readonly string[] StorageAddons = ["InventoryRetainer", "InventoryRetainerLarge", "RetainerCharacter", "MiragePrismPrismBox", "Cabinet", "CabinetWithdraw"];
 
     internal Configuration Config { get; }
@@ -139,6 +142,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnStorageClosing(AddonEvent type, AddonArgs args)
     {
+        storageTransferUntil = Environment.TickCount64 + 3000;
         storageRefreshPending = true;
         storageRefreshUntil = Environment.TickCount64 + 3000;
         nextStorageScan = 0;
@@ -223,22 +227,66 @@ public sealed class Plugin : IDalamudPlugin
             nextScan = Environment.TickCount64 + 500;
         }
         if (ready) UpdateStorage();
+        else wantedItems.Suspend();
         RetainerScan.Update(ready);
-        // Loot highlighting needs fresh ownership even when the checklist is closed.
-        if (!window.IsOpen && !Config.HighlightLoot)
+        // Loot highlighting and chat notifications need fresh ownership with the checklist closed.
+        if (!window.IsOpen && !Config.HighlightLoot && !Config.NotifyWantedItems)
         {
             Owned = null;
+            wantedItems.Suspend();
             return;
         }
         if (!ready || Environment.TickCount64 < nextScan) return;
         nextScan = Environment.TickCount64 + 1000;
-        try { Owned = StorageCache.Merge(InventoryReader.Read(Inventory, Data), Config.StorageSnapshots, characterId); }
+        try
+        {
+            var live = InventoryReader.Read(Inventory, Data);
+            Owned = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
+            UpdateWantedNotifications(live);
+        }
         catch (Exception ex)
         {
             Owned = null;
+            wantedItems.Suspend();
             nextScan = Environment.TickCount64 + 5000;
             Log.Warning(ex, "Could not read character inventory");
         }
+    }
+
+    private void UpdateWantedNotifications(IReadOnlyCollection<OwnedItem>? live)
+    {
+        try
+        {
+            var transferring = Environment.TickCount64 <= storageTransferUntil ||
+                StorageAddons.Any(name => GameGui.GetAddonByName(name).IsVisible);
+            var obtained = wantedItems.ObserveOwnership(characterId, Config.Sets, live, Owned, transferring);
+            if (Config.NotifyWantedItems) PrintWantedItems("Obtained", obtained);
+            CheckWantedLoot();
+        }
+        catch (Exception ex) { Log.Warning(ex, "Could not update wanted-item chat notifications"); }
+    }
+
+    private unsafe void CheckWantedLoot()
+    {
+        var loot = FFXIVClientStructs.FFXIV.Client.Game.UI.Loot.Instance();
+        if (loot == null) return;
+        var entries = new List<WantedLootItem>();
+        foreach (ref readonly var entry in loot->Items)
+        {
+            if (entry.ItemId == 0 || entry.Time <= 0) continue;
+            entries.Add(new(entry.ChestObjectId, entry.ChestItemIndex, entry.ItemId,
+                (entry.RollState is FFXIVClientStructs.FFXIV.Client.Game.UI.RollState.UpToNeed or
+                    FFXIVClientStructs.FFXIV.Client.Game.UI.RollState.UpToGreed) &&
+                entry.RollResult == FFXIVClientStructs.FFXIV.Client.Game.UI.RollResult.UnAwarded));
+        }
+        var notices = wantedItems.ObserveLoot(characterId, Config.Sets, Owned, entries);
+        if (Config.NotifyWantedItems) PrintWantedItems("Wanted loot dropped", notices);
+    }
+
+    private void PrintWantedItems(string action, IEnumerable<WantedItemNotice> notices)
+    {
+        foreach (var notice in notices)
+            Chat.Print($"{action}: {ItemName(notice.ItemId)} — for {string.Join(", ", notice.Sets)}.", "GearScout");
     }
 
     private void UpdateStorage()

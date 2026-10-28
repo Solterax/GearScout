@@ -275,6 +275,79 @@ Check(normalListGuard.Pieces.Count == 2 && normalListGuard.Pieces.Single(p => p.
     normalListGuard.Pieces.Single(p => p.Slot == "Body").ItemId == 102,
     "Normal sets continue replacing the single chosen piece in a slot without changing other slots");
 
+var noticeSet = new TrackedSet { Name = "Bard plan", Job = "BRD", Pieces = [new() { Slot = "Head", ItemId = 100 }] };
+var noticeGlam = new TrackedSet { Name = "Hat collection", IsGlam = true, Pieces = [new() { Slot = "Head", ItemId = 100 }, new() { Slot = "Head", ItemId = 101 }] };
+TrackedSet[] noticeSets = [noticeSet, noticeGlam];
+OwnedItem[] hat100 = [new(100, 1, "Bag", false)];
+var notices = new WantedItemTracker();
+Check(notices.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Startup baseline never announces already-owned target items");
+Check(notices.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Unchanged ownership never repeats acquisition messages");
+var newFind = new WantedItemTracker();
+newFind.ObserveOwnership(100, noticeSets, [], []);
+var found = newFind.ObserveOwnership(100, noticeSets, hat100, hat100);
+Check(found.Count == 1 && found[0].ItemId == 100 && found[0].Sets.SequenceEqual(new[] { "Bard plan (BRD)", "Hat collection (Glam)" }),
+    "Newly obtained wanted item reports all matching normal and glam set names");
+Check(newFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Repeated scans do not repeat a new-item message");
+Check(newFind.ObserveOwnership(100, noticeSets, [new(100, 1, "Equipped", true)], [new(100, 1, "Equipped", true)]).Count == 0,
+    "Moving wanted gear between bags and equipment does not announce it again");
+Check(newFind.ObserveOwnership(100, noticeSets, [new(100, 2, "Bag", false)], [new(100, 2, "Bag", false)]).Count == 0,
+    "Additional copies of an already-known item do not produce acquisition messages");
+newFind.ObserveOwnership(100, noticeSets, [], []);
+Check(newFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Removing then reacquiring known gear does not repeat its acquisition notice");
+var untargeted = new WantedItemTracker();
+untargeted.ObserveOwnership(100, [], [], []);
+Check(untargeted.ObserveOwnership(100, [], hat100, hat100).Count == 0 &&
+    untargeted.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Non-target gains and later set edits do not announce owned items");
+var cachedFind = new WantedItemTracker();
+cachedFind.ObserveOwnership(100, noticeSets, [], [new(100, 1, "Retainer (saved)", false)]);
+Check(cachedFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Withdrawing a known saved-storage item is not a new acquisition");
+var storageFind = new WantedItemTracker();
+storageFind.ObserveOwnership(100, noticeSets, [], []);
+Check(storageFind.ObserveOwnership(100, noticeSets, [], [new(100, 1, "Dresser (saved)", false)]).Count == 0 &&
+    storageFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Discovering existing storage contents is silent and prevents later withdrawal messages");
+var transferFind = new WantedItemTracker();
+transferFind.ObserveOwnership(100, noticeSets, [], []);
+Check(transferFind.ObserveOwnership(100, noticeSets, hat100, hat100, true).Count == 0 &&
+    transferFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Active or just-closed storage transfers do not create new-item messages");
+var interruptedFind = new WantedItemTracker();
+interruptedFind.ObserveOwnership(100, noticeSets, [], []);
+Check(interruptedFind.ObserveOwnership(100, noticeSets, null, null).Count == 0 &&
+    interruptedFind.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0, "Unavailable inventory requires a new silent baseline");
+interruptedFind.Suspend();
+Check(interruptedFind.ObserveOwnership(100, noticeSets, [new(101, 1, "Bag", false)], [new(101, 1, "Bag", false)]).Count == 0,
+    "Loading transitions cannot announce items discovered on resuming");
+Check(newFind.ObserveOwnership(200, noticeSets, [new(101, 1, "Bag", false)], [new(101, 1, "Bag", false)]).Count == 0,
+    "Changing character establishes an independent silent baseline");
+var hqFind = new WantedItemTracker();
+hqFind.ObserveOwnership(100, noticeSets, [], []);
+Check(hqFind.ObserveOwnership(100, noticeSets, [new(1_000_100, 1, "Bag", false)], [new(1_000_100, 1, "Bag", false)]).Single().ItemId == 100,
+    "Acquisition notices normalize HQ item IDs");
+var dropFind = new WantedItemTracker();
+WantedLootItem drop = new(500, 0, 100, true);
+Check(dropFind.ObserveLoot(100, noticeSets, null, [drop]).Count == 0, "Unknown ownership cannot produce a wanted-drop message");
+var dropped = dropFind.ObserveLoot(100, noticeSets, [], [drop]);
+Check(dropped.Count == 1 && dropped[0].Sets.SequenceEqual(found[0].Sets), "Missing wanted drop names every set that still needs it");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [drop]).Count == 0, "Repeated loot scans announce the same chest item only once");
+dropFind.ObserveLoot(100, noticeSets, [], []);
+Check(dropFind.ObserveLoot(100, noticeSets, [], [drop]).Count == 0, "Closing or reopening the loot window cannot repeat a drop message");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [drop with { ChestItemIndex = 1 }]).Count == 1,
+    "A second copy from a distinct chest entry is a separate new drop");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [drop with { ChestObjectId = 501 }]).Count == 1,
+    "The same item from a different chest can produce a new drop notice");
+Check(dropFind.ObserveLoot(100, noticeSets, hat100, [drop with { ChestObjectId = 502 }]).Count == 0,
+    "Already-owned items suppress wanted-drop messages");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [drop with { ChestObjectId = 502 }]).Count == 0,
+    "Losing an owned item cannot make its old loot entry announce itself later");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [new(503, 0, 999, true)]).Count == 0,
+    "Unwanted loot never creates a message");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [new(504, 0, 100, false)]).Count == 0 &&
+    dropFind.ObserveLoot(100, noticeSets, [], [new(504, 0, 100, true)]).Count == 1,
+    "Loot waits for roll eligibility before announcing a newly loaded entry");
+Check(dropFind.ObserveLoot(100, noticeSets, [], [new(505, 0, 1_000_100, true)]).Single().ItemId == 100,
+    "Wanted-drop messages normalize HQ IDs");
+Check(dropFind.ObserveLoot(200, noticeSets, [], [drop]).Count == 1,
+    "Drop deduplication is isolated by character");
+
 var retainerScan = new RetainerScanSession();
 RetainerScanTarget[] retainers = [new(10, "First"), new(20, "Second"), new(10, "Duplicate"), new(0, "Invalid")];
 var waiting = new RetainerScanObservation(100, true, false, false, false, 0, false, false);

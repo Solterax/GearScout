@@ -9,5 +9,6 @@ public sealed class Configuration : IPluginConfiguration
     public List<TrackedSet> Sets { get; set; } = [];
     public Dictionary<string, Guid> SelectedByJob { get; set; } = [];
     public bool HighlightLoot { get; set; } = true;
+    public bool NotifyWantedItems { get; set; } = true;
     public List<StorageSnapshot> StorageSnapshots { get; set; } = [];
 }

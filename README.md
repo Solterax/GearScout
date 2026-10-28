@@ -58,6 +58,14 @@ Glam sets track appearances, hide the materia column, and include saved dresser/
 
 The loot current-job-only option has been removed. Old saved values no longer affect loot checks. The checklist selector shows your current job's regular gear sets plus every glam set.
 
+## Wanted-item chat messages
+
+**Chat messages for wanted drops and new items** is enabled by default and works independently of the blue glow, including while the checklist is closed. GearScout prints local chat messages when a missing wanted item appears as eligible loot and when you newly obtain a wanted item. Each message includes the item name and matching set names, with their job or Glam label. It checks all saved jobs and glam lists.
+
+For example: `[GearScout] Wanted loot dropped: Example Hat — for Bard plan (BRD), Hat collection (Glam).` A later acquisition produces an **Obtained** message. Each chest item is announced once, even if the loot window is reopened. Drop notices name only sets still missing the item, using the same ownership/copy rules as the glow.
+
+The first complete inventory scan after login, reload or loading establishes a silent baseline. Existing inventory, cached storage items, extra copies of a known item and set edits do not produce acquisition messages. Checking storage is silent; transfers while storage is open or shortly after closing are also suppressed. During a monitored character session, an item already observed as owned is not announced again if it is moved, removed and reacquired. Missing or unvisited storage is still limited by the last-known ownership checks described below. These messages appear only in your local chat; GearScout does not post to party or other players.
+
 The loot glow appears only for items required by a saved set and missing from live inventory and the current character's saved storage checks. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown live inventory suppresses the glow.
 
 The glow, badge and blue name appear only while Need or Greed is available and clear once you roll, pass, the item resolves, or the loot window closes. The original native name color is restored when highlighting stops or the plugin unloads. It uses exact gear item IDs: coffers and exchange tokens are not mapped to their rewards. The glow and badge are click-through visual overlays; they do not select or roll on items.

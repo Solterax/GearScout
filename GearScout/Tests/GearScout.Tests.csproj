@@ -12,6 +12,7 @@
     <Compile Include="../StorageCache.cs" Link="StorageCache.cs" />
     <Compile Include="../GearSearch.cs" Link="GearSearch.cs" />
     <Compile Include="../RetainerScanSession.cs" Link="RetainerScanSession.cs" />
+    <Compile Include="../WantedItemTracker.cs" Link="WantedItemTracker.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

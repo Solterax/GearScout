@@ -38,6 +38,12 @@ internal sealed class MainWindow : Window
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Highlights wanted, missing items for ALL saved jobs, including gear you can only Greed.\nIncludes saved retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
         ImGui.TextColored(Muted, "Loot checks: all saved jobs");
+        var notifyWanted = plugin.Config.NotifyWantedItems;
+        if (ImGui.Checkbox("Chat messages for wanted drops and new items", ref notifyWanted))
+        {
+            plugin.Config.NotifyWantedItems = notifyWanted;
+            SaveSafely();
+        }
         DrawStorage();
         ImGui.Spacing();
         ImGui.SetNextItemWidth(-95);
