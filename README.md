@@ -35,6 +35,10 @@ Search reads installed game data locally and builds its index in small batches. 
 
 Click **New glam set**, name the outfit, and fill its slots through the same item search. Glam searches filter by slot only, showing gear from every job. The set appears as **[Glam]** in the selector on every job and can be edited, renamed, saved and reloaded like a regular set.
 
+Each glam slot can contain as many different pieces as you want. In the editor, click **Add gear...** under a slot, then check multiple search results; the search stays open while you select items or change the search text. Uncheck an item to remove it, or click **Done** and use the individual **Remove** buttons in the editor. Click **Save set** to keep the list. Selecting an item already in that slot does not add a duplicate.
+
+The main checklist groups all selected pieces by slot, with a separate ownership status and location for each piece. **Needs work only** shows the missing appearances. Normal gear sets continue to allow one selected item per slot.
+
 Glam sets track appearances, hide the materia column, and include saved dresser/armoire/retainer ownership. One owned appearance can satisfy repeated slots, so the same unique ring appearance can be used on both hands. Missing glam pieces participate in the same all-job loot indicators. Regular sets retain job filtering and separate-copy requirements. This plans an outfit; it does not apply a glamour plate or change the game's equip rules.
 
 ## Features and scope

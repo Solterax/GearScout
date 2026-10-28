@@ -227,6 +227,54 @@ Check(savedGlam.IsGlam && savedGlam.Job == "" && savedGlam.Pieces.Count == 3, "G
 Check(GearSearch.Draft(glam).IsGlam && GearSearch.Draft(glam).Id == glam.Id, "Editing a glam set preserves its type and identity");
 Check(!System.Text.Json.JsonSerializer.Deserialize<TrackedSet>("{\"Job\":\"BRD\"}")!.IsGlam, "Older saved job sets remain regular sets");
 
+var glamList = new TrackedSet { IsGlam = true, Name = "Appearance collection" };
+foreach (var item in catalog.Where(i => GearSearch.Fits(i, "", "Head", true)))
+    GearSearch.SetPiece(glamList, "Head", item);
+GearSearch.SetPiece(glamList, "Body", catalog[2]);
+Check(glamList.Pieces.Count(p => p.Slot == "Head") == 4 && glamList.Pieces.Count(p => p.Slot == "Body") == 1,
+    "Glam list retains multiple choices in a slot and independent choices in other slots");
+GearSearch.SetPiece(glamList, "Head", catalog[0]);
+Check(glamList.Pieces.Count == 5, "Checking an already-selected glam item never creates a duplicate in its slot");
+GearSearch.SetPiece(glamList, "RingLeft", catalog[5]);
+GearSearch.SetPiece(glamList, "RingRight", catalog[5]);
+GearSearch.RemovePiece(glamList, "RingLeft", 105);
+Check(glamList.Pieces.Any(p => p.Slot == "RingRight" && p.ItemId == 105) &&
+    !glamList.Pieces.Any(p => p.Slot == "RingLeft"), "Removing one glam entry preserves the same item in another slot");
+GearSearch.RemovePiece(glamList, "Head", 100);
+Check(glamList.Pieces.Where(p => p.Slot == "Head").Select(p => p.ItemId).ToHashSet().SetEquals(new uint[] {101, 103, 104}) &&
+    glamList.Pieces.Any(p => p.Slot == "Body"), "Removing a glam choice preserves its sibling choices and other slots");
+GearSearch.SetPiece(glamList, "Head", catalog[0]);
+Check(glamList.Pieces.Count(p => p.Slot == "Head") == 4, "An unchecked glam piece can be added again");
+Reject(() => GearSearch.SetPiece(glamList, "Body", catalog[0]), "Multi-item glam lists still reject incorrect slots");
+var listRoundTrip = System.Text.Json.JsonSerializer.Deserialize<TrackedSet>(System.Text.Json.JsonSerializer.Serialize(glamList))!;
+Check(listRoundTrip.IsGlam && listRoundTrip.Id == glamList.Id &&
+    listRoundTrip.Pieces.Select(p => (p.Slot, p.ItemId)).SequenceEqual(glamList.Pieces.Select(p => (p.Slot, p.ItemId))),
+    "Every selected glam piece survives saving and reloading with the existing configuration format");
+var listStatuses = GearMatcher.Match(listRoundTrip.Pieces, appearanceInventory, true);
+Check(listStatuses.Count == 6 && listStatuses.Count(s => s.Match != null) == 2 &&
+    listStatuses.Where(s => s.Match == null).Select(s => s.Piece.ItemId).ToHashSet().SetEquals(new uint[] {100, 102, 103, 104}),
+    "Checklist accounts for every same-slot glam choice with its own ownership status");
+Check(LootMatcher.MissingItems([listRoundTrip], appearanceInventory).SetEquals(new uint[] {100, 102, 103, 104}),
+    "Every missing glam choice participates in loot tracking while owned choices are excluded");
+var listDraft = GearSearch.Draft(listRoundTrip);
+GearSearch.RemovePiece(listDraft, "Head", 101);
+Check(listRoundTrip.Pieces.Any(p => p.Slot == "Head" && p.ItemId == 101) && listDraft.Pieces.Count == listRoundTrip.Pieces.Count - 1,
+    "Editing or cancelling a multi-item glam draft does not alter the saved collection");
+var largeGlamList = new TrackedSet { IsGlam = true };
+foreach (var itemId in Enumerable.Range(1000, 50))
+    GearSearch.SetPiece(largeGlamList, "Head", new((uint)itemId, "Collection item", 1, 1, headSlot, bard, false));
+Check(largeGlamList.Pieces.Count == 50 && GearMatcher.Match(largeGlamList.Pieces, [], true).Count == 50,
+    "Glam slots support lists larger than a full normal gear set without a slot-count cap");
+foreach (var piece in largeGlamList.Pieces.ToArray()) GearSearch.RemovePiece(largeGlamList, piece.Slot, piece.ItemId);
+Check(largeGlamList.Pieces.Count == 0, "All glam choices can be individually removed to leave an empty list");
+var normalListGuard = new TrackedSet { Job = "BRD" };
+GearSearch.SetPiece(normalListGuard, "Head", catalog[0]);
+GearSearch.SetPiece(normalListGuard, "Body", catalog[2]);
+GearSearch.SetPiece(normalListGuard, "Head", catalog[3]);
+Check(normalListGuard.Pieces.Count == 2 && normalListGuard.Pieces.Single(p => p.Slot == "Head").ItemId == 103 &&
+    normalListGuard.Pieces.Single(p => p.Slot == "Body").ItemId == 102,
+    "Normal sets continue replacing the single chosen piece in a slot without changing other slots");
+
 var retainerScan = new RetainerScanSession();
 RetainerScanTarget[] retainers = [new(10, "First"), new(20, "Second"), new(10, "Duplicate"), new(0, "Invalid")];
 var waiting = new RetainerScanObservation(100, true, false, false, false, 0, false, false);

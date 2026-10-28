@@ -125,7 +125,9 @@ internal sealed class MainWindow : Window
             ImGui.TextWrapped("Waiting for your character's inventory. Ownership is not yet known.");
             return;
         }
-        var statuses = GearMatcher.Match(selected.Pieces, owned, selected.IsGlam);
+        IEnumerable<GearPiece> pieces = selected.Pieces;
+        if (selected.IsGlam) pieces = pieces.OrderBy(p => Array.IndexOf(GearSearch.Slots, p.Slot));
+        var statuses = GearMatcher.Match(pieces, owned, selected.IsGlam);
         var have = statuses.Count(s => s.Match != null);
         var melded = statuses.Count(s => s.Melds is { IsExact: true });
         ImGui.Spacing();
@@ -154,9 +156,10 @@ internal sealed class MainWindow : Window
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SlotName(status.Piece.Slot));
             ImGui.TableNextColumn();
-            if (ImGui.Selectable($"{plugin.ItemName(status.Piece.ItemId)}##edit-{status.Piece.Slot}"))
+            if (ImGui.Selectable($"{plugin.ItemName(status.Piece.ItemId)}##edit-{status.Piece.Slot}-{status.Piece.ItemId}"))
                 plugin.EditSet(selected, status.Piece.Slot);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{plugin.ItemName(status.Piece.ItemId)}\nItem ID: {status.Piece.ItemId}\nClick to change this slot in the set editor.");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip($"{plugin.ItemName(status.Piece.ItemId)}\nItem ID: {status.Piece.ItemId}\n" +
+                (selected.IsGlam ? "Click to add or remove pieces for this slot in the set editor." : "Click to change this slot in the set editor."));
             ImGui.TableNextColumn();
             ImGui.TextColored(status.Match != null ? Green : Amber,
                 status.Match is { Equipped: true } ? "Equipped" : status.Match != null ? "Owned" : "Missing");

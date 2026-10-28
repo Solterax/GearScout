@@ -51,7 +51,7 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
         ImGui.InputTextWithHint("##name", "Set name", ref name, 120);
         if (importedCopy) ImGui.TextWrapped("This will save a local copy. The imported set stays unchanged.");
         ImGui.TextWrapped(draft.IsGlam
-            ? "Click a slot to search gear from every job. Glam sets stay visible on all jobs and track appearances."
+            ? "Add as many pieces as you want to each slot. Check items in search to add them; uncheck or Remove to take them off the list."
             : "Click a gear piece or an empty slot to search. Results fit this slot and job, including gear above your current level.");
         ImGui.BeginDisabled(string.IsNullOrWhiteSpace(name));
         if (ImGui.Button("Save set"))
@@ -70,20 +70,36 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
                 new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y))))
         {
             ImGui.TableSetupColumn("Slot", ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("Gear piece — click to search", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("##clear", ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn(draft.IsGlam ? "Gear pieces" : "Gear piece — click to search", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("##clear", ImGuiTableColumnFlags.WidthFixed, 75);
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
             foreach (var key in GearSearch.Slots)
             {
+                if (draft.IsGlam)
+                {
+                    ImGui.TableNextRow();
+                    ImGui.TableNextColumn(); ImGui.TextUnformatted(GearSearch.SlotName(key));
+                    ImGui.TableNextColumn();
+                    if (ImGui.Selectable($"Add gear...##add-{key}")) SearchSlot(key);
+                    ImGui.TableNextColumn();
+                    foreach (var entry in draft.Pieces.Where(p => p.Slot == key).ToArray())
+                    {
+                        ImGui.TableNextRow();
+                        ImGui.TableNextColumn();
+                        ImGui.TableNextColumn(); ImGui.TextUnformatted(plugin.ItemName(entry.ItemId));
+                        ImGui.TableNextColumn();
+                        if (ImGui.SmallButton($"Remove##{key}-{entry.ItemId}")) GearSearch.RemovePiece(draft, key, entry.ItemId);
+                    }
+                    continue;
+                }
                 var piece = draft.Pieces.FirstOrDefault(p => p.Slot == key);
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(GearSearch.SlotName(key));
                 ImGui.TableNextColumn();
                 if (ImGui.Selectable($"{(piece == null ? "Select gear..." : plugin.ItemName(piece.ItemId))}##{key}"))
-                {
-                    slot = key; query = ""; lastSearch = null; openPicker = true;
-                }
+                    SearchSlot(key);
                 ImGui.TableNextColumn();
                 if (piece != null && ImGui.SmallButton($"Clear##{key}")) draft.Pieces.RemoveAll(p => p.Slot == key);
             }
@@ -94,6 +110,11 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
             ImGui.OpenPopup("Find gear"); openPicker = false; focusSearch = true;
         }
         DrawPicker();
+    }
+
+    private void SearchSlot(string key)
+    {
+        slot = key; query = ""; lastSearch = null; openPicker = true;
     }
 
     private void DrawPicker()
@@ -115,7 +136,9 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
                 results = GearSearch.Search(plugin.Catalog.Items, draft.Job, slot, query, draft.IsGlam);
                 lastSearch = key;
             }
-            ImGui.TextUnformatted($"{results.Count} matching items. Highest item level first.");
+            ImGui.TextUnformatted(draft.IsGlam
+                ? $"{results.Count} matches; {draft.Pieces.Count(p => p.Slot == slot)} selected in this slot. Check items to add them."
+                : $"{results.Count} matching items. Highest item level first.");
             if (ImGui.BeginTable("searchResults", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, new Vector2(0, 305)))
             {
                 ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
@@ -135,7 +158,16 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
                         ImGui.TableNextRow();
                         ImGui.TableNextColumn();
                         ImGui.BeginDisabled(blocked);
-                        if (ImGui.Selectable($"{item.Name}##{item.ItemId}"))
+                        if (draft.IsGlam)
+                        {
+                            var included = draft.Pieces.Any(p => p.Slot == slot && p.ItemId == item.ItemId);
+                            if (ImGui.Checkbox($"{item.Name}##{item.ItemId}", ref included))
+                            {
+                                if (included) GearSearch.SetPiece(draft, slot, item);
+                                else GearSearch.RemovePiece(draft, slot, item.ItemId);
+                            }
+                        }
+                        else if (ImGui.Selectable($"{item.Name}##{item.ItemId}"))
                         {
                             GearSearch.SetPiece(draft, slot, item);
                             ImGui.CloseCurrentPopup();
@@ -152,7 +184,7 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
             }
             if (results.Count == 0) ImGui.TextWrapped(draft.IsGlam ? "No matching gear. Try a shorter search." : "No matching gear. Try a shorter search; some jobs have no off-hand equipment.");
         }
-        if (ImGui.Button("Close search")) ImGui.CloseCurrentPopup();
+        if (ImGui.Button(draft!.IsGlam ? "Done" : "Close search")) ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
     }
 }

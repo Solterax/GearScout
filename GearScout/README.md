@@ -1,4 +1,4 @@
-# GearScout 0.7.1
+# GearScout 0.9.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -19,6 +19,8 @@ Search is backed by local Item, EquipSlotCategory and ClassJobCategory game shee
 Switch to Bard to see this example. When you switch jobs, only sets whose imported job exactly matches your active class/job appear. Bard sets do not appear on Archer. A sheet containing multiple sets imports each set; use the dropdown to switch between them. Selected-set parameters in links are passed to XIVGear's API. Reimporting the same URL refreshes its saved sets instead of duplicating them. Sets and selection are saved in Dalamud's normal plugin configuration.
 
 For job-independent outfit planning, click **New glam set**. Slot searches show gear from all jobs, and the set appears with a **[Glam]** prefix on every job. Glam sets track appearances rather than distinct equipped copies: one owned item can fill repeated slots, including both rings, and the materia column is hidden. Saved storage and missing-loot indicators include glam targets. Regular sets keep their job/slot filters and physical-copy requirements. Glam planning does not apply plates or alter game equip restrictions.
+
+Glam slots support lists of pieces. Click **Add gear...** in the editor, check as many search results as wanted, then **Done** and **Save set**. Search remains open for repeated selections and queries. Uncheck a result or use its individual **Remove** button to remove just that piece. Every selected piece appears in the checklist, grouped by slot with its own ownership status and location. Identical items are not duplicated within a slot; normal sets retain a single item per slot. Existing glam sets use the same saved format and can be extended without migration.
 
 ## Ownership rules
 
@@ -89,6 +91,7 @@ Manual acceptance checks:
 23. Edit an imported set, save its local copy, and refresh the original link. Verify the custom copy survives unchanged. Switch jobs while an editor is open and verify its job remains the original one. Save an empty set, rename it and later fill its slots.
 24. Start Scan all retainers from the bell list with multiple available retainers. Verify each inventory loads, its timestamp/count updates, and the scan returns to the list before selecting the next. Test reordered and unavailable retainers, localized menus, Stop, unexpected dialogs and loading timeouts. Confirm completed snapshots survive a plugin reload and no items or ventures are changed.
 25. Open each supported store without pressing Scan. Verify the first complete check saves immediately, including reopening unchanged contents within 30 seconds. Withdraw, deposit, split and merge stacks; close immediately after a transfer and verify persisted counts on reload. Interrupt loading and verify incomplete sources never overwrite a previous snapshot.
+26. Add several hats and body pieces to a glam set using search checkboxes, change the query and verify previous choices remain checked. Uncheck one, finish searching, remove another from the editor and save. Verify all remaining items have independent checklist statuses/locations and missing-loot tracking. Reload and verify every entry persists. Cancel an edit and verify saved choices remain. Check an older glam set can be extended, and a normal set still replaces the one item in a slot. Scroll long lists and confirm both editor windows retain their fixed size.
 
 ## Implementation and references
 

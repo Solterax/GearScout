@@ -53,12 +53,21 @@ public static class GearSearch
     {
         if (!Fits(item, set.Job, slot, set.IsGlam)) throw new ArgumentException("That item does not fit this job and slot.");
         if (ConflictsWithOtherRing(set, slot, item)) throw new ArgumentException("A unique ring cannot occupy both ring slots.");
+        if (set.IsGlam)
+        {
+            if (!set.Pieces.Any(p => p.Slot == slot && p.ItemId == item.ItemId))
+                set.Pieces.Add(new GearPiece { Slot = slot, ItemId = item.ItemId });
+            return;
+        }
         var previous = set.Pieces.FirstOrDefault(p => p.Slot == slot);
         if (previous?.ItemId == item.ItemId) return;
         set.Pieces.RemoveAll(p => p.Slot == slot);
         // A changed piece has no specified meld plan. Never transfer the old item's materia targets.
         set.Pieces.Add(new GearPiece { Slot = slot, ItemId = item.ItemId });
     }
+
+    public static void RemovePiece(TrackedSet set, string slot, uint itemId) =>
+        set.Pieces.RemoveAll(p => p.Slot == slot && p.ItemId == itemId);
 
     public static string SlotName(string slot) => slot switch
     {
