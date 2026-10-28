@@ -27,12 +27,15 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 - Compare melded materia against the imported target by type and grade, including duplicate materia and all five overmeld slots. Hover the Materia column to see required, current, missing and extra melds. Slot order is ignored.
 - Prefer correctly melded owned copies when duplicate gear exists. Use **Needs work only** to include both missing gear and incorrect or unknown melds.
 - Save target sets and per-job selection across sessions. Reimporting the same link refreshes its saved sets.
+- Subtle blue glow around matching item icons in the game's standard loot-roll window, even while the checklist is closed. Enabled by default for every saved set of the current job; untick **Loot: current job only** to include other jobs. Disable with **Blue glow on loot in saved sets**.
+
+The loot glow marks membership in a saved set, including pieces already owned. It appears only while Need or Greed is available and clears once you roll, pass, the item resolves, or the loot window closes. It uses exact gear item IDs: coffers and exchange tokens are not mapped to their rewards. The glow is a click-through visual overlay; it does not select or roll on items.
 
 **Missing** means absent from the checked storage. Retainers, saddlebags, glamour storage, and other characters are excluded. HQ quality, food, and relic stat allocations are not validated. Loose materia in bags does not count as melded materia. No character or inventory data is sent to XIVGear; imports only send the supplied link to its public API.
 
 After updating from 0.1.0, click **Refresh from link** on existing sets to load their materia targets. Old saved sets remain available and show unknown materia until refreshed. An explicitly empty target expects an unmelded item; extra materia is shown as a mismatch.
 
-This is an initial version. Compilation, importer checks, inventory-matching logic, and the supplied live XIVGear URL have been verified; in-game loading, layout, and inventory/job transitions still require manual verification.
+Compilation, importer checks, inventory/materia matching, loot-matching rules, and the supplied live XIVGear URL have been verified. In-game loading, inventory/job transitions, and the loot glow's alignment, clipping and appearance still require manual verification.
 
 ## Build and test
 

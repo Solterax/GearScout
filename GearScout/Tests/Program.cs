@@ -71,6 +71,29 @@ var saved = System.Text.Json.JsonSerializer.Serialize(example);
 var restored = System.Text.Json.JsonSerializer.Deserialize<List<TrackedSet>>(saved)!;
 Check(restored[0].Pieces.Single(p => p.Slot == "Body").Materia!.SequenceEqual(new uint[] { 41772, 41772 }), "Materia targets survive configuration serialization");
 
+var lootSets = new[]
+{
+    new TrackedSet { Job = "BRD", Pieces = [new() { ItemId = 10 }] },
+    new TrackedSet { Job = "BRD", Pieces = [new() { ItemId = 20 }] },
+    new TrackedSet { Job = "WAR", Pieces = [new() { ItemId = 30 }] },
+};
+var bardTargets = LootMatcher.TargetItems(lootSets, "BRD", true);
+Check(bardTargets.SetEquals(new uint[] { 10, 20 }), "Loot checks every saved set for the current job");
+Check(LootMatcher.TargetItems(lootSets, "BRD", false).Contains(30), "Optional loot scope includes other jobs");
+Check(!bardTargets.Contains(30), "Default loot scope excludes other jobs");
+Check(LootMatcher.TargetItems(lootSets, "brd", true).SetEquals(bardTargets), "Loot job matching ignores case");
+Check(LootMatcher.CanHighlight(10, 0, [new(10, true)], bardTargets), "Eligible target loot highlighted");
+Check(LootMatcher.CanHighlight(1_000_010, 0, [new(10, true)], bardTargets), "HQ loot normalized to imported base item ID");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, false)], bardTargets), "Rolled, passed or unavailable items not highlighted");
+Check(!LootMatcher.CanHighlight(40, 0, [new(40, true)], bardTargets), "Non-target loot not highlighted");
+Check(!LootMatcher.CanHighlight(0, 0, [new(0, true)], bardTargets), "Empty loot slots not highlighted");
+Check(LootMatcher.CanHighlight(20, 0, [new(10, false), new(20, true)], bardTargets), "Reordered distinct loot slots matched by item ID");
+Check(!LootMatcher.CanHighlight(10, 5, [new(10, true), new(10, false)], bardTargets), "Ambiguous duplicate loot not assigned another copy's roll permission");
+Check(LootMatcher.CanHighlight(10, 1, [new(10, false), new(10, true)], bardTargets), "Duplicate loot uses the correct slot's roll state");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, false), new(10, true)], bardTargets), "Resolved duplicate does not inherit an eligible copy's glow");
+Check(!LootMatcher.CanHighlight(10, 0, [], bardTargets), "No live roll data means no glow");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], LootMatcher.TargetItems([], "BRD", true)), "Removing a saved target removes its loot highlight");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

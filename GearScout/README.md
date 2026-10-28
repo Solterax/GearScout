@@ -1,4 +1,4 @@
-# GearScout 0.2.0
+# GearScout 0.3.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -24,6 +24,8 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 - Materia is compared by item ID (type and grade), with duplicates counted separately. Order does not matter, and all five meld slots are checked. Exact matches require no missing or extra materia.
 - Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
 - Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
+- Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved sets for the current job are checked, even when the checklist is closed. Use the loot settings to disable it or include other jobs.
+- The glow indicates saved-set membership, irrespective of ownership or materia. It is shown only for available Need/Greed rolls, and does not automate rolling. Coffers and exchange tokens are not mapped to their rewards.
 - Retainers, chocobo saddlebags, glamour dresser, armoire and other characters are excluded. An item in those places can appear as missing. Move it to your bags or Armoury Chest to have it counted.
 - Custom/negative XIVGear item IDs are unsupported. Invalid imports report an error and leave the previous saved sets intact.
 - Saved target sets are shared by the plugin configuration; ownership is always read from the current character and is never persisted.
@@ -48,7 +50,7 @@ dotnet run --project Tests/GearScout.Tests.csproj -- --live
 
 ## Validation status
 
-Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, invalid links, duplicate rings, materia type/grade/count checks, overmelds, copy allocation and saved-target serialization. The supplied Bard URL has also been tested against the live API. In-game loading, appearance and live inventory/job transitions still need manual verification; compilation does not prove those behaviours.
+Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, invalid links, duplicate rings, materia type/grade/count checks, overmelds, copy allocation, saved-target serialization and loot matching/eligibility. The supplied Bard URL has also been tested against the live API. In-game loading, glow appearance/alignment and live inventory/job transitions still need manual verification; compilation does not prove those behaviours.
 
 Manual acceptance checks:
 
@@ -62,10 +64,16 @@ Manual acceptance checks:
 8. Refresh a set saved in 0.1.0; check that materia targets appear. Hover a mismatched piece and compare the lists with the game's item tooltip.
 9. Test reordered correct melds, a wrong grade, duplicate materia, missing overmelds and an extra meld on a target with no materia.
 10. With two copies of the same gear, verify the correctly melded copy is selected even if the other copy is equipped. Check **Needs work only** keeps mismatched melds visible.
+11. With a matching direct gear drop, open the Need/Greed window and check for a soft blue outline around the icon. Non-target items and pass-only items must not glow. Close the checklist and verify the glow remains.
+12. Roll, pass or let the matching drop resolve and verify the glow clears. Test duplicate loot slots with one rolled and one still eligible, and scroll a list longer than the visible area.
+13. Move and rescale the loot window; check glow alignment and clipping. Hide the game UI and close the loot window to confirm no stale glow remains. Verify mouse and controller loot controls work normally.
+14. Disable the glow, include other jobs, remove a target set and change jobs; verify the highlighted items follow the settings immediately. Unload the plugin while the loot window is open and confirm no highlight remains.
 
 ## Implementation and references
 
 `Plugin.cs` handles lifecycle and framework-thread updates. `MainWindow.cs` draws the UI. `InventoryReader.cs` uses Dalamud's inventory service. `XivGearImporter.cs` fetches and parses sets without game access. `Models.cs` contains copy-aware matching. HTTP work is asynchronous; game access and configuration changes run on the framework thread. Importing sends the supplied link to XIVGear's public API; no character or inventory data is sent.
+
+`LootMatcher.cs` implements job scope, item-ID normalization and conservative roll-eligibility matching. `LootHighlighter.cs` reads the current NeedGreed list and live loot slots on each draw, finds visible item-icon bounds and draws a soft blue ImGui outline. It retains no native pointers, changes no game nodes, adds no input handlers and suppresses highlights when the UI is hidden. Because it is an ImGui overlay, it shares ImGui's foreground layering relative to native windows.
 
 - XIVGear API: https://github.com/xiv-gear-planner/gear-planner/blob/main/API_DOC.md
 - Dalamud plugin development: https://dalamud.dev/plugin-development/getting-started/

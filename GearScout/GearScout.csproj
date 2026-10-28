@@ -1,11 +1,11 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Author>Solterax</Author>
     <RepoUrl>https://github.com/Solterax/GearScout</RepoUrl>
     <Name>GearScout</Name>
     <Punchline>Track your XIVGear sets for your current job.</Punchline>
-    <Description>Import XIVGear links and compare gear and melded materia against equipped items, bags, and Armoury Chest. Only sets for the current job are displayed.</Description>
+    <Description>Import XIVGear links, compare gear and melded materia, and highlight matching gear in the loot-roll window. Checks equipped items, bags, and Armoury Chest. Only sets for the current job are displayed.</Description>
     <Tags>gear;xivgear;inventory</Tags>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

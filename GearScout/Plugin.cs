@@ -20,9 +20,11 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager Data { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
     [PluginService] internal static ICondition Condition { get; private set; } = null!;
+    [PluginService] internal static IGameGui GameGui { get; private set; } = null!;
 
     private readonly WindowSystem windows = new("GearScout");
     private readonly MainWindow window;
+    private readonly LootHighlighter lootHighlighter;
     private readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<uint, string> itemNames = [];
@@ -41,9 +43,11 @@ public sealed class Plugin : IDalamudPlugin
     {
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new();
         window = new MainWindow(this);
+        lootHighlighter = new LootHighlighter(this);
         windows.AddWindow(window);
         Commands.AddHandler("/gearscout", new CommandInfo(OnCommand) { HelpMessage = "Open XIVGear gear tracking." });
         PluginInterface.UiBuilder.Draw += windows.Draw;
+        PluginInterface.UiBuilder.Draw += lootHighlighter.Draw;
         PluginInterface.UiBuilder.OpenMainUi += Open;
         PluginInterface.UiBuilder.OpenConfigUi += Open;
         Framework.Update += Update;
@@ -135,6 +139,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Framework.Update -= Update;
         PluginInterface.UiBuilder.Draw -= windows.Draw;
+        PluginInterface.UiBuilder.Draw -= lootHighlighter.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= Open;
         PluginInterface.UiBuilder.OpenConfigUi -= Open;
         Commands.RemoveHandler("/gearscout");

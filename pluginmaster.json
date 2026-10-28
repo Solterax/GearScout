@@ -3,8 +3,8 @@
     "Author": "Solterax",
     "Name": "GearScout",
     "InternalName": "GearScout",
-    "AssemblyVersion": "0.2.0.0",
-    "Description": "Import XIVGear links and compare gear and melded materia against equipped items, bags, and Armoury Chest. Only sets for the current job are displayed.",
+    "AssemblyVersion": "0.3.0.0",
+    "Description": "Import XIVGear links, compare gear and melded materia, and highlight matching gear in the loot-roll window. Checks equipped items, bags, and Armoury Chest. Only sets for the current job are displayed.",
     "ApplicableVersion": "any",
     "Tags": [
       "gear",
@@ -21,8 +21,8 @@
     "RepoUrl": "https://github.com/Solterax/GearScout",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.2.0/GearScout-plugin.zip",
-    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.2.0/GearScout-plugin.zip",
-    "LastUpdate": "1793145519"
+    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.3.0/GearScout-plugin.zip",
+    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.3.0/GearScout-plugin.zip",
+    "LastUpdate": "1793146104"
   }
 ]
