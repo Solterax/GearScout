@@ -51,12 +51,10 @@ public sealed class Plugin : IDalamudPlugin
     {
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new();
         Config.StorageSnapshots ??= [];
-        // Older versions enabled current-job loot filtering by default. Loot farming
-        // often targets another job, so upgrade once to checking all saved jobs.
-        if (Config.Version < 2)
+        // Loot always checks all saved jobs. Resaving also drops the obsolete job-scope setting.
+        if (Config.Version < 3)
         {
-            Config.LootCurrentJobOnly = false;
-            Config.Version = 2;
+            Config.Version = 3;
             storageSavePending = true;
         }
         window = new MainWindow(this);

@@ -35,16 +35,9 @@ internal sealed class MainWindow : Window
             plugin.Config.HighlightLoot = highlightLoot;
             SaveSafely();
         }
-        ImGui.SameLine();
-        var currentJobOnly = plugin.Config.LootCurrentJobOnly;
-        if (ImGui.Checkbox("Loot: current job only", ref currentJobOnly))
-        {
-            plugin.Config.LootCurrentJobOnly = currentJobOnly;
-            SaveSafely();
-        }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Leave unticked to highlight missing items for ALL saved jobs, including gear you can only Greed.\nTick to restrict loot highlights to the job you are playing.\nIncludes saved retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
-        ImGui.TextColored(Muted, currentJobOnly ? "Loot checks: current job only" : "Loot checks: all saved jobs (including other jobs' gear)");
+            ImGui.SetTooltip("Highlights wanted, missing items for ALL saved jobs, including gear you can only Greed.\nIncludes saved retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
+        ImGui.TextColored(Muted, "Loot checks: all saved jobs");
         DrawStorage();
         ImGui.Spacing();
         ImGui.SetNextItemWidth(-95);

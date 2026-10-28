@@ -1,4 +1,4 @@
-# GearScout 0.5.1
+# GearScout 0.5.2
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -24,7 +24,7 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 - Materia is compared by item ID (type and grade), with duplicates counted separately. Order does not matter, and all five meld slots are checked. Exact matches require no missing or extra materia.
 - Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
 - Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
-- Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved jobs are checked by default, even when farming other jobs' gear with Greed and when the checklist is closed. The current-job-only loot option is available as an explicit restriction. Version 0.4.1 switches older configurations to all-job loot scope once; the checklist's job filtering is unchanged.
+- Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. Loot always checks all saved jobs, even when farming other jobs' gear with Greed and when the checklist is closed. The current-job-only loot option has been removed, including its configuration field and matcher filtering. Old saved values are ignored; the checklist's job filtering is unchanged.
 - Wanted missing loot also receives a blue **!** badge over the icon. Matching selected item names and list-row names (where shown) turn blue. Name colors restore when the item no longer qualifies, highlighting is disabled, the addon finalizes or GearScout unloads.
 - Version 0.5.1 enlarges the complete badge by 50% and removes embedded native rarity color macros while a matching name is blue. The original encoded text and color are restored afterward; unrelated formatting and icons are preserved. Nested name components and previews without a selected-item index are supported.
 - The glow requires an item to be wanted by a saved set and missing from live inventory and the character's saved storage checks. Owned gear suppresses it regardless of materia; a set needing two identical rings still requires two copies, while alternative saved sets can reuse one owned copy. Ownership refreshes once per second with the checklist closed while highlighting is enabled. Unknown live inventory suppresses the glow.
@@ -71,7 +71,7 @@ Manual acceptance checks:
 11. With a matching direct gear drop, open the Need/Greed window and check for a soft blue outline around the icon. Non-target items and pass-only items must not glow. Close the checklist and verify the glow remains.
 12. Roll, pass or let the matching drop resolve and verify the glow clears. Test duplicate loot slots with one rolled and one still eligible, and scroll a list longer than the visible area.
 13. Move and rescale the loot window; check glow alignment and clipping. Hide the game UI and close the loot window to confirm no stale glow remains. Verify mouse and controller loot controls work normally.
-14. Disable the glow, include other jobs, remove a target set and change jobs; verify the highlighted items follow the settings immediately. Unload the plugin while the loot window is open and confirm no highlight remains.
+14. Disable the glow, remove a target set and change jobs; verify the highlights update correctly and continue to include other saved jobs. Unload the plugin while the loot window is open and confirm no highlight remains.
 15. With the checklist closed, verify an owned wanted item does not glow. Move it out of checked storage and verify the glow appears after the ownership refresh; return it and verify it clears. Wrong melds on an owned copy must not trigger a glow. Test a two-identical-ring target with one and then two owned copies.
 16. Open two different retainers' inventories/equipment, allowing a few seconds for loading. Verify independent sources and item counts; rapidly switch retainers or interrupt loading and ensure no source is misattributed or replaced by incomplete data.
 17. Open the dresser and armoire. Check gear on another page/filter, expanded outfit pieces and an empty source. Verify counts against the game and correct item IDs. Reload GearScout and zone away: saved ownership should persist for this character only.

@@ -77,44 +77,41 @@ var lootSets = new[]
     new TrackedSet { Job = "BRD", Pieces = [new() { ItemId = 20 }] },
     new TrackedSet { Job = "WAR", Pieces = [new() { ItemId = 30 }] },
 };
-var bardTargets = LootMatcher.TargetItems(lootSets, "BRD", true);
-Check(bardTargets.SetEquals(new uint[] { 10, 20 }), "Loot checks every saved set for the current job");
-Check(LootMatcher.TargetItems(lootSets, "BRD", false).Contains(30), "Optional loot scope includes other jobs");
+var lootTargets = LootMatcher.TargetItems(lootSets);
+Check(lootTargets.SetEquals(new uint[] { 10, 20, 30 }), "Loot always checks every saved job");
 var farmingSets = new[] { new TrackedSet { Job = "WAR", Pieces = [new() { ItemId = 20871 }] } };
-var farmingTargets = LootMatcher.MissingItems(farmingSets, "BLM", false, []);
+var farmingTargets = LootMatcher.MissingItems(farmingSets, []);
 Check(LootMatcher.CanHighlight(20871, 0, [new(20871, true)], farmingTargets), "Skallic Amulet of Fending can glow while farming Warrior gear on Black Mage");
-Check(!LootMatcher.CanHighlight(20871, 0, [new(20871, true)], LootMatcher.MissingItems(farmingSets, "BLM", false, [new(20871, 1, "Bag", false)])), "Other-job loot still stays unlit when already owned");
-Check(!bardTargets.Contains(30), "Current-job-only option excludes other jobs");
-Check(LootMatcher.TargetItems(lootSets, "brd", true).SetEquals(bardTargets), "Loot job matching ignores case");
-Check(LootMatcher.CanHighlight(10, 0, [new(10, true)], bardTargets), "Eligible target loot highlighted");
-Check(LootMatcher.CanHighlight(1_000_010, 0, [new(10, true)], bardTargets), "HQ loot normalized to imported base item ID");
-Check(!LootMatcher.CanHighlight(10, 0, [new(10, false)], bardTargets), "Rolled, passed or unavailable items not highlighted");
-Check(!LootMatcher.CanHighlight(40, 0, [new(40, true)], bardTargets), "Non-target loot not highlighted");
-Check(!LootMatcher.CanHighlight(0, 0, [new(0, true)], bardTargets), "Empty loot slots not highlighted");
-Check(LootMatcher.CanHighlight(20, 0, [new(10, false), new(20, true)], bardTargets), "Reordered distinct loot slots matched by item ID");
-Check(!LootMatcher.CanHighlight(10, 5, [new(10, true), new(10, false)], bardTargets), "Ambiguous duplicate loot not assigned another copy's roll permission");
-Check(LootMatcher.CanHighlight(10, 1, [new(10, false), new(10, true)], bardTargets), "Duplicate loot uses the correct slot's roll state");
-Check(!LootMatcher.CanHighlight(10, 0, [new(10, false), new(10, true)], bardTargets), "Resolved duplicate does not inherit an eligible copy's glow");
-Check(!LootMatcher.CanHighlight(10, 0, [], bardTargets), "No live roll data means no glow");
-Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], LootMatcher.TargetItems([], "BRD", true)), "Removing a saved target removes its loot highlight");
+Check(!LootMatcher.CanHighlight(20871, 0, [new(20871, true)], LootMatcher.MissingItems(farmingSets, [new(20871, 1, "Bag", false)])), "Other-job loot still stays unlit when already owned");
+Check(LootMatcher.CanHighlight(10, 0, [new(10, true)], lootTargets), "Eligible target loot highlighted");
+Check(LootMatcher.CanHighlight(1_000_010, 0, [new(10, true)], lootTargets), "HQ loot normalized to imported base item ID");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, false)], lootTargets), "Rolled, passed or unavailable items not highlighted");
+Check(!LootMatcher.CanHighlight(40, 0, [new(40, true)], lootTargets), "Non-target loot not highlighted");
+Check(!LootMatcher.CanHighlight(0, 0, [new(0, true)], lootTargets), "Empty loot slots not highlighted");
+Check(LootMatcher.CanHighlight(20, 0, [new(10, false), new(20, true)], lootTargets), "Reordered distinct loot slots matched by item ID");
+Check(!LootMatcher.CanHighlight(10, 5, [new(10, true), new(10, false)], lootTargets), "Ambiguous duplicate loot not assigned another copy's roll permission");
+Check(LootMatcher.CanHighlight(10, 1, [new(10, false), new(10, true)], lootTargets), "Duplicate loot uses the correct slot's roll state");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, false), new(10, true)], lootTargets), "Resolved duplicate does not inherit an eligible copy's glow");
+Check(!LootMatcher.CanHighlight(10, 0, [], lootTargets), "No live roll data means no glow");
+Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], LootMatcher.TargetItems([])), "Removing a saved target removes its loot highlight");
 
-var missingTargets = LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 1, "Equipped", true)]);
-Check(missingTargets.SetEquals(new uint[] { 20 }), "Owned gear excluded while wanted missing gear remains eligible");
+var missingTargets = LootMatcher.MissingItems(lootSets, [new(10, 1, "Equipped", true)]);
+Check(missingTargets.SetEquals(new uint[] { 20, 30 }), "Owned gear excluded while wanted missing gear from all jobs remains eligible");
 Check(!LootMatcher.CanHighlight(10, 0, [new(10, true)], missingTargets), "Already owned wanted loot does not glow");
 Check(LootMatcher.CanHighlight(20, 0, [new(20, true)], missingTargets), "Wanted missing loot can glow");
-Check(LootMatcher.MissingItems(lootSets, "BRD", true, null).Count == 0, "Unknown inventory suppresses all loot glow");
-Check(LootMatcher.MissingItems(lootSets, "BRD", true, []).SetEquals(bardTargets), "Known empty inventory permits missing targets");
+Check(LootMatcher.MissingItems(lootSets, null).Count == 0, "Unknown inventory suppresses all loot glow");
+Check(LootMatcher.MissingItems(lootSets, []).SetEquals(lootTargets), "Known empty inventory permits missing targets");
 foreach (var location in new[] { "Bag 1", "Armoury Chest", "Equipped" })
-    Check(!LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 1, location, location == "Equipped")]).Contains(10),
+    Check(!LootMatcher.MissingItems(lootSets, [new(10, 1, location, location == "Equipped")]).Contains(10),
         "Owned item in " + location + " suppresses loot glow");
 var twoRingSet = new TrackedSet { Job = "BRD", Pieces = rings.ToList() };
-Check(LootMatcher.MissingItems([twoRingSet], "BRD", true, [new(1, 1, "Equipped", true)]).Contains(1), "One ring still glows when the same set needs a second copy");
-Check(!LootMatcher.MissingItems([twoRingSet], "BRD", true, [new(1, 1, "Equipped", true), new(1, 1, "Bag", false)]).Contains(1), "Two owned copies suppress two-ring target glow");
-Check(!LootMatcher.MissingItems([lootSets[0], lootSets[0]], "BRD", true, [new(10, 1, "Bag", false)]).Contains(10), "Alternative saved sets share one owned copy instead of demanding duplicates");
-Check(LootMatcher.MissingItems(lootSets, "BRD", false, [new(10, 1, "Bag", false), new(20, 1, "Bag", false)]).SetEquals(new uint[] { 30 }), "All-jobs scope still excludes owned targets");
-Check(!LootMatcher.MissingItems([new TrackedSet { Job = "BRD", Pieces = [targetA] }], "BRD", true, [Copy([2])]).Contains(10), "Incorrect materia does not make an owned gear item missing");
-Check(LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 0, "Bag", false)]).Contains(10), "Zero-quantity inventory entry does not suppress missing loot");
-Check(!LootMatcher.MissingItems(lootSets, "BRD", true, [new(1_000_010, 1, "Bag", false)]).Contains(10), "Owned HQ item suppresses target glow");
+Check(LootMatcher.MissingItems([twoRingSet], [new(1, 1, "Equipped", true)]).Contains(1), "One ring still glows when the same set needs a second copy");
+Check(!LootMatcher.MissingItems([twoRingSet], [new(1, 1, "Equipped", true), new(1, 1, "Bag", false)]).Contains(1), "Two owned copies suppress two-ring target glow");
+Check(!LootMatcher.MissingItems([lootSets[0], lootSets[0]], [new(10, 1, "Bag", false)]).Contains(10), "Alternative saved sets share one owned copy instead of demanding duplicates");
+Check(LootMatcher.MissingItems(lootSets, [new(10, 1, "Bag", false), new(20, 1, "Bag", false)]).SetEquals(new uint[] { 30 }), "All-jobs scope still excludes owned targets");
+Check(!LootMatcher.MissingItems([new TrackedSet { Job = "BRD", Pieces = [targetA] }], [Copy([2])]).Contains(10), "Incorrect materia does not make an owned gear item missing");
+Check(LootMatcher.MissingItems(lootSets, [new(10, 0, "Bag", false)]).Contains(10), "Zero-quantity inventory entry does not suppress missing loot");
+Check(!LootMatcher.MissingItems(lootSets, [new(1_000_010, 1, "Bag", false)]).Contains(10), "Owned HQ item suppresses target glow");
 
 var checkedAt = DateTimeOffset.Parse("2026-10-28T00:00:00Z");
 var storage = new List<StorageSnapshot>();
@@ -127,7 +124,7 @@ StorageCache.Replace(storage, Snapshot(200, "retainer:1:bags", new StoredItem { 
 var merged = StorageCache.Merge([], storage, 100)!;
 Check(merged.Count == 1 && merged[0].ItemId == 10, "Storage ownership isolated to logged-in character");
 Check(merged[0].LastCheckedUtc == checkedAt && merged[0].Location.Contains("saved"), "Saved source and check time preserved for ownership UI");
-Check(!LootMatcher.MissingItems(lootSets, "BRD", true, merged).Contains(10), "Saved retainer gear suppresses missing loot glow away from the bell");
+Check(!LootMatcher.MissingItems(lootSets, merged).Contains(10), "Saved retainer gear suppresses missing loot glow away from the bell");
 Check(GearMatcher.Match([targetA], merged)[0].Melds!.IsExact, "Retainer materia preserved in saved ownership");
 Check(StorageCache.Merge(null, storage, 100) == null, "Unreadable live inventory stays unknown with cached storage");
 Check(StorageCache.Merge([], storage, 0) == null, "No character means no storage ownership");
