@@ -29,11 +29,17 @@ Use **Edit set** to change or rename a local set, or click an item name directly
 
 Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces have no specified materia target; unchanged imported-copy pieces retain their meld plans. Materia-plan editing is not part of this editor.
 
+## Build a job-independent glam set
+
+Click **New glam set**, name the outfit, and fill its slots through the same item search. Glam searches filter by slot only, showing gear from every job. The set appears as **[Glam]** in the selector on every job and can be edited, renamed, saved and reloaded like a regular set.
+
+Glam sets track appearances, hide the materia column, and include saved dresser/armoire/retainer ownership. One owned appearance can satisfy repeated slots, so the same unique ring appearance can be used on both hands. Missing glam pieces participate in the same all-job loot indicators. Regular sets retain job filtering and separate-copy requirements. This plans an outfit; it does not apply a glamour plate or change the game's equip rules.
+
 ## Features and scope
 
 - Import individual sets or multi-set sheets and choose between saved sets.
 - Create, rename and edit local sets with a slot/job-filtered gear search; edit imported sets as independent local copies.
-- Display only sets whose imported job matches the active class/job. Bard targets appear on Bard, not Archer.
+- Display regular sets for the active class/job, plus every glam set. Bard gear sets appear on Bard, not Archer; glam sets appear on both.
 - Count equipped items, inventory bags, and Armoury Chest items on the current character. Refresh approximately once per second while open.
 - Show a location for matching gear and require separate physical copies for duplicate target items.
 - Compare melded materia against the imported target by type and grade, including duplicate materia and all five overmeld slots. Hover the Materia column to see required, current, missing and extra melds. Slot order is ignored.
@@ -42,7 +48,7 @@ Search reads installed game data locally and builds its index in small batches. 
 - Save per-character checks of retainer bags/equipped gear, the glamour dresser (including expanded outfit pieces), and the armoire. Saved items count as owned after those windows close and across plugin/game restarts.
 - Subtle blue glow and blue **!** badge on wanted, missing item icons in the game's standard loot-roll window, with the matching selected item name (and list-row names where present) colored blue. Works while the checklist is closed and always checks **all saved jobs**, so farming another job's gear while playing your main job still works. Disable with **Blue glow on missing set items**.
 
-The loot current-job-only option has been removed. Old saved values no longer affect loot checks. The checklist selector still shows only the job you are playing.
+The loot current-job-only option has been removed. Old saved values no longer affect loot checks. The checklist selector shows your current job's regular gear sets plus every glam set.
 
 The loot glow appears only for items required by a saved set and missing from live inventory and the current character's saved storage checks. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown live inventory suppresses the glow.
 

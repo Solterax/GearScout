@@ -1,4 +1,4 @@
-# GearScout 0.6.0
+# GearScout 0.7.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -17,6 +17,8 @@ To build a local set, click **New set**, enter a name, and click any slot in the
 Search is backed by local Item, EquipSlotCategory and ClassJobCategory game sheets. Results fit the set's job/slot, sort by item level, and support both ring slots. A unique ring already selected in the opposite slot is disabled. Off-hand slots may have no results for some jobs. New/changed pieces have unspecified materia targets; the editor does not edit meld plans. Local sets integrate with saved ownership and loot checks but do not equip gear or modify the game's character gearsets.
 
 Switch to Bard to see this example. When you switch jobs, only sets whose imported job exactly matches your active class/job appear. Bard sets do not appear on Archer. A sheet containing multiple sets imports each set; use the dropdown to switch between them. Selected-set parameters in links are passed to XIVGear's API. Reimporting the same URL refreshes its saved sets instead of duplicating them. Sets and selection are saved in Dalamud's normal plugin configuration.
+
+For job-independent outfit planning, click **New glam set**. Slot searches show gear from all jobs, and the set appears with a **[Glam]** prefix on every job. Glam sets track appearances rather than distinct equipped copies: one owned item can fill repeated slots, including both rings, and the materia column is hidden. Saved storage and missing-loot indicators include glam targets. Regular sets keep their job/slot filters and physical-copy requirements. Glam planning does not apply plates or alter game equip restrictions.
 
 ## Ownership rules
 

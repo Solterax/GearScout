@@ -5,6 +5,7 @@ public sealed class TrackedSet
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "Untitled set";
     public string Job { get; set; } = "";
+    public bool IsGlam { get; set; }
     public string SourceUrl { get; set; } = "";
     public List<GearPiece> Pieces { get; set; } = [];
 }
@@ -51,10 +52,12 @@ public static class GearMatcher
 {
     // Allocate physical copies once per set. One ring cannot satisfy two slots.
     // Rings can be worn on either hand; allocation is based on item ID, not slot.
-    public static List<PieceStatus> Match(IEnumerable<GearPiece> pieces, IEnumerable<OwnedItem> inventory)
+    public static List<PieceStatus> Match(IEnumerable<GearPiece> pieces, IEnumerable<OwnedItem> inventory, bool appearanceOnly = false)
     {
         var targets = pieces.ToList();
         var owned = inventory.Where(i => i.Quantity > 0).OrderByDescending(i => i.Equipped).ToList();
+        // One owned appearance can be reused in multiple glam slots, including both rings.
+        if (appearanceOnly) return targets.Select(p => Match([p], owned)[0]).ToList();
         var matches = new OwnedItem?[targets.Count];
         foreach (var group in targets.Select((piece, index) => (piece, index)).GroupBy(p => p.piece.ItemId))
         {

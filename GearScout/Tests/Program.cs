@@ -206,6 +206,27 @@ Check(persistedSet.Id == edited.Id && persistedSet.Job == "BRD" && persistedSet.
 Check(LootMatcher.MissingItems([edited], []).Contains(103), "Locally built items participate in missing-loot checks");
 Check(!LootMatcher.MissingItems([edited], [new(103, 1, "Bag", false)]).Contains(103), "Owned local-set gear suppresses its loot highlight");
 
+var glam = new TrackedSet { IsGlam = true, Name = "Glam test" };
+Check(GearSearch.VisibleForJob(glam, "BRD") && GearSearch.VisibleForJob(glam, "WAR") && GearSearch.VisibleForJob(glam, "BLM"), "Glam set stays visible across jobs without a job assignment");
+Check(!GearSearch.VisibleForJob(edited, "WAR") && GearSearch.VisibleForJob(edited, "BRD"), "Regular sets keep their current-job visibility restriction");
+Check(GearSearch.Search(catalog, "", "Head", "hat", true).Select(i => i.ItemId).SequenceEqual(new uint[] { 103, 101, 100, 104 }), "Glam search includes matching gear from all jobs");
+Check(GearSearch.Search(catalog, "", "Body", "hat", true).Count == 0, "Glam search still enforces equipment slots");
+GearSearch.SetPiece(glam, "Head", catalog[1]);
+Check(glam.Job == "" && glam.Pieces.Single().ItemId == 101, "Job-independent glam set accepts job-restricted gear");
+GearSearch.SetPiece(glam, "RingLeft", catalog[5]);
+GearSearch.SetPiece(glam, "RingRight", catalog[5]);
+Check(glam.Pieces.Count(p => p.ItemId == 105) == 2, "One unique ring appearance may be used in both glam slots");
+var appearanceInventory = new[] { new OwnedItem(101, 1, "Glamour dresser (saved)", false), new OwnedItem(105, 1, "Armoire (saved)", false) };
+Check(GearMatcher.Match(glam.Pieces, appearanceInventory, true).All(s => s.Match != null), "One stored appearance satisfies repeated glam slots");
+Check(LootMatcher.MissingItems([glam], appearanceInventory).Count == 0, "Owned repeated appearances do not trigger glam loot highlights");
+Check(LootMatcher.MissingItems([glam], []).SetEquals(new uint[] { 101, 105 }), "Missing glam appearances participate in all-job loot tracking");
+var physicalRings = new TrackedSet { Job = "BRD", Pieces = [new() { Slot = "RingLeft", ItemId = 105 }, new() { Slot = "RingRight", ItemId = 105 }] };
+Check(LootMatcher.MissingItems([glam, physicalRings], appearanceInventory).Contains(105), "Combat set still demands a second physical copy alongside a satisfied glam set");
+var savedGlam = System.Text.Json.JsonSerializer.Deserialize<TrackedSet>(System.Text.Json.JsonSerializer.Serialize(glam))!;
+Check(savedGlam.IsGlam && savedGlam.Job == "" && savedGlam.Pieces.Count == 3, "Glam mode and its unassigned job survive saving and reloading");
+Check(GearSearch.Draft(glam).IsGlam && GearSearch.Draft(glam).Id == glam.Id, "Editing a glam set preserves its type and identity");
+Check(!System.Text.Json.JsonSerializer.Deserialize<TrackedSet>("{\"Job\":\"BRD\"}")!.IsGlam, "Older saved job sets remain regular sets");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

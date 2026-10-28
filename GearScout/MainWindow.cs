@@ -63,7 +63,9 @@ internal sealed class MainWindow : Window
         ImGui.TextUnformatted($"Current job: {job}");
         ImGui.SameLine();
         if (ImGui.Button("New set")) plugin.CreateSet();
-        var sets = plugin.Config.Sets.Where(s => s.Job == job).ToList();
+        ImGui.SameLine();
+        if (ImGui.Button("New glam set")) plugin.CreateGlamSet();
+        var sets = plugin.Config.Sets.Where(s => GearSearch.VisibleForJob(s, job)).ToList();
         if (sets.Count == 0)
         {
             ImGui.Spacing();
@@ -74,11 +76,11 @@ internal sealed class MainWindow : Window
         plugin.Config.SelectedByJob.TryGetValue(job, out var selectedId);
         var selected = sets.FirstOrDefault(s => s.Id == selectedId) ?? sets[0];
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.BeginCombo("##sets", selected.Name))
+        if (ImGui.BeginCombo("##sets", (selected.IsGlam ? "[Glam] " : "") + selected.Name))
         {
             foreach (var set in sets)
             {
-                if (ImGui.Selectable($"{set.Name}##{set.Id}", set.Id == selected.Id))
+                if (ImGui.Selectable($"{(set.IsGlam ? "[Glam] " : "")}{set.Name}##{set.Id}", set.Id == selected.Id))
                 {
                     plugin.Config.SelectedByJob[job] = set.Id;
                     SaveSafely();
@@ -123,31 +125,31 @@ internal sealed class MainWindow : Window
             ImGui.TextWrapped("Waiting for your character's inventory. Ownership is not yet known.");
             return;
         }
-        var statuses = GearMatcher.Match(selected.Pieces, owned);
+        var statuses = GearMatcher.Match(selected.Pieces, owned, selected.IsGlam);
         var have = statuses.Count(s => s.Match != null);
         var melded = statuses.Count(s => s.Melds is { IsExact: true });
         ImGui.Spacing();
-        ImGui.TextUnformatted($"{have} / {statuses.Count} pieces owned   |   {statuses.Count - have} missing from checked storage");
+        ImGui.TextUnformatted($"{have} / {statuses.Count} {(selected.IsGlam ? "appearances" : "pieces")} owned   |   {statuses.Count - have} missing from checked storage");
         var plannedMelds = statuses.Count(s => s.Piece.Materia != null);
-        if (plannedMelds > 0) ImGui.TextUnformatted($"{melded} / {plannedMelds} pieces have the planned materia (hover Materia for details)");
+        if (!selected.IsGlam && plannedMelds > 0) ImGui.TextUnformatted($"{melded} / {plannedMelds} pieces have the planned materia (hover Materia for details)");
         ImGui.ProgressBar(statuses.Count == 0 ? 0 : (float)have / statuses.Count, new Vector2(-1, 7), "");
-        ImGui.TextColored(Muted, "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
+        ImGui.TextColored(Muted, selected.IsGlam ? "Glam set: all jobs; one owned appearance can be reused across slots." : "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
         if (!local && selected.Pieces.Any(p => p.Materia == null))
             ImGui.TextColored(Amber, "Materia targets unavailable for some pieces. Click Refresh from link to update an older import.");
         ImGui.TextColored(Muted, "Retainers, dresser and armoire use last checked contents. Reopen them after changes.");
 
-        if (!ImGui.BeginTable("gear", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
+        if (!ImGui.BeginTable("gear", selected.IsGlam ? 4 : 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
                 ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY, new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y)))) return;
         ImGui.TableSetupColumn("Slot", ImGuiTableColumnFlags.WidthFixed, 90);
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 90);
-        ImGui.TableSetupColumn("Materia", ImGuiTableColumnFlags.WidthFixed, 135);
+        if (!selected.IsGlam) ImGui.TableSetupColumn("Materia", ImGuiTableColumnFlags.WidthFixed, 135);
         ImGui.TableSetupColumn("Location", ImGuiTableColumnFlags.WidthFixed, 125);
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
         foreach (var status in statuses)
         {
-            if (missingOnly && status.Match != null && (status.Melds is { IsExact: true } || (local && status.Piece.Materia == null))) continue;
+            if (missingOnly && status.Match != null && (selected.IsGlam || status.Melds is { IsExact: true } || (local && status.Piece.Materia == null))) continue;
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(SlotName(status.Piece.Slot));
@@ -158,8 +160,11 @@ internal sealed class MainWindow : Window
             ImGui.TableNextColumn();
             ImGui.TextColored(status.Match != null ? Green : Amber,
                 status.Match is { Equipped: true } ? "Equipped" : status.Match != null ? "Owned" : "Missing");
-            ImGui.TableNextColumn();
-            DrawMateria(status, local);
+            if (!selected.IsGlam)
+            {
+                ImGui.TableNextColumn();
+                DrawMateria(status, local);
+            }
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(status.Match?.Location ?? "Not found");
             if (status.Match?.LastCheckedUtc is { } checkedAt && ImGui.IsItemHovered())

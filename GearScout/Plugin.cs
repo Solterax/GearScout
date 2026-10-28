@@ -77,23 +77,26 @@ public sealed class Plugin : IDalamudPlugin
     private void OnCommand(string command, string args) => Open();
     private void Open() => window.IsOpen = true;
     internal void CreateSet() { if (!string.IsNullOrEmpty(CurrentJob)) setEditor.Create(CurrentJob); }
+    internal void CreateGlamSet() => setEditor.CreateGlam();
     internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
 
     internal void SaveLocalSet(TrackedSet set)
     {
-        if (string.IsNullOrWhiteSpace(set.Name) || GearSearch.JobBit(set.Job) == 0)
+        if (string.IsNullOrWhiteSpace(set.Name) || (!set.IsGlam && GearSearch.JobBit(set.Job) == 0))
             throw new ArgumentException("Give the set a name and a valid job.");
+        if (set.IsGlam) set.Job = "";
+        var selectionJob = set.IsGlam ? CurrentJob : set.Job;
         var oldSets = Config.Sets;
-        var hadSelection = Config.SelectedByJob.TryGetValue(set.Job, out var oldSelection);
+        var hadSelection = Config.SelectedByJob.TryGetValue(selectionJob, out var oldSelection);
         set.SourceUrl = "";
         Config.Sets = Config.Sets.Where(s => s.Id != set.Id).Append(set).ToList();
-        Config.SelectedByJob[set.Job] = set.Id;
+        if (!string.IsNullOrEmpty(selectionJob)) Config.SelectedByJob[selectionJob] = set.Id;
         try { Save(); }
         catch
         {
             Config.Sets = oldSets;
-            if (hadSelection) Config.SelectedByJob[set.Job] = oldSelection;
-            else Config.SelectedByJob.Remove(set.Job);
+            if (hadSelection) Config.SelectedByJob[selectionJob] = oldSelection;
+            else Config.SelectedByJob.Remove(selectionJob);
             throw;
         }
     }

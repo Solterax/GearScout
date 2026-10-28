@@ -21,7 +21,7 @@ public static class LootMatcher
         // Within one set, two identical rings still require two physical copies.
         return sets
             .SelectMany(s => s.Pieces.Where(p => p.ItemId != 0).GroupBy(p => p.ItemId)
-                .Where(g => counts.GetValueOrDefault(g.Key) < g.Count()).Select(g => g.Key)).ToHashSet();
+                .Where(g => counts.GetValueOrDefault(g.Key) < (s.IsGlam ? 1 : g.Count())).Select(g => g.Key)).ToHashSet();
     }
 
     public static bool CanHighlight(uint itemId, int uiIndex, IReadOnlyList<LootRollEntry> rolls, ISet<uint> targets)

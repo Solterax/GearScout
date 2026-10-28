@@ -22,6 +22,8 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
         Open(new TrackedSet { Job = job, Name = $"New {job} set" });
     }
 
+    public void CreateGlam() => Open(new TrackedSet { IsGlam = true, Name = "New glam set" });
+
     public void Open(TrackedSet source, string? initialSlot = null)
     {
         draft = GearSearch.Draft(source);
@@ -41,11 +43,13 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
     public override void Draw()
     {
         if (draft == null) return;
-        ImGui.TextUnformatted($"Gear set for {draft.Job}");
+        ImGui.TextUnformatted(draft.IsGlam ? "Glam set — all jobs" : $"Gear set for {draft.Job}");
         ImGui.SetNextItemWidth(-1);
         ImGui.InputTextWithHint("##name", "Set name", ref name, 120);
         if (importedCopy) ImGui.TextWrapped("This will save a local copy. The imported set stays unchanged.");
-        ImGui.TextWrapped("Click a gear piece or an empty slot to search. Results fit this slot and job, including gear above your current level.");
+        ImGui.TextWrapped(draft.IsGlam
+            ? "Click a slot to search gear from every job. Glam sets stay visible on all jobs and track appearances."
+            : "Click a gear piece or an empty slot to search. Results fit this slot and job, including gear above your current level.");
         ImGui.BeginDisabled(string.IsNullOrWhiteSpace(name));
         if (ImGui.Button("Save set"))
         {
@@ -93,7 +97,7 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
     {
         ImGui.SetNextWindowSize(new Vector2(680, 440), ImGuiCond.Appearing);
         if (!ImGui.BeginPopup("Find gear")) return;
-        ImGui.TextUnformatted($"{draft!.Job} / {GearSearch.SlotName(slot)}");
+        ImGui.TextUnformatted($"{(draft!.IsGlam ? "Glam — all jobs" : draft.Job)} / {GearSearch.SlotName(slot)}");
         if (focusSearch) { ImGui.SetKeyboardFocusHere(); focusSearch = false; }
         ImGui.SetNextItemWidth(-1);
         ImGui.InputTextWithHint("##query", "Search gear by name or item ID...", ref query, 200);
@@ -101,10 +105,10 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
         else if (!plugin.Catalog.Ready) ImGui.TextUnformatted("Loading local gear data...");
         else
         {
-            var key = draft.Job + "|" + slot + "|" + query;
+            var key = draft.IsGlam + "|" + draft.Job + "|" + slot + "|" + query;
             if (lastSearch != key)
             {
-                results = GearSearch.Search(plugin.Catalog.Items, draft.Job, slot, query);
+                results = GearSearch.Search(plugin.Catalog.Items, draft.Job, slot, query, draft.IsGlam);
                 lastSearch = key;
             }
             ImGui.TextUnformatted($"{results.Count} matching items. Highest item level first.");
@@ -142,7 +146,7 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
                 finally { clipper.Destroy(); }
                 ImGui.EndTable();
             }
-            if (results.Count == 0) ImGui.TextWrapped("No matching gear. Try a shorter search; some jobs have no off-hand equipment.");
+            if (results.Count == 0) ImGui.TextWrapped(draft.IsGlam ? "No matching gear. Try a shorter search." : "No matching gear. Try a shorter search; some jobs have no off-hand equipment.");
         }
         if (ImGui.Button("Close search")) ImGui.CloseCurrentPopup();
         ImGui.EndPopup();
