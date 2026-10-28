@@ -18,7 +18,7 @@ public sealed class GearPiece
 }
 
 public sealed record OwnedItem(uint ItemId, int Quantity, string Location, bool Equipped,
-    IReadOnlyList<uint>? Materia = null);
+    IReadOnlyList<uint>? Materia = null, DateTimeOffset? LastCheckedUtc = null);
 public sealed record PieceStatus(GearPiece Piece, OwnedItem? Match)
 {
     public MateriaComparison? Melds => Piece.Materia != null && Match?.Materia != null

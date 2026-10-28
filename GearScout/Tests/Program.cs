@@ -112,6 +112,46 @@ Check(!LootMatcher.MissingItems([new TrackedSet { Job = "BRD", Pieces = [targetA
 Check(LootMatcher.MissingItems(lootSets, "BRD", true, [new(10, 0, "Bag", false)]).Contains(10), "Zero-quantity inventory entry does not suppress missing loot");
 Check(!LootMatcher.MissingItems(lootSets, "BRD", true, [new(1_000_010, 1, "Bag", false)]).Contains(10), "Owned HQ item suppresses target glow");
 
+var checkedAt = DateTimeOffset.Parse("2026-10-28T00:00:00Z");
+var storage = new List<StorageSnapshot>();
+StorageSnapshot Snapshot(ulong owner, string key, params StoredItem[] items) => new()
+{
+    CharacterId = owner, Key = key, Name = key, CheckedAtUtc = checkedAt, Items = items.ToList(),
+};
+Check(StorageCache.Replace(storage, Snapshot(100, "retainer:1:bags", new StoredItem { ItemId = 10, Quantity = 1, Materia = [1] })), "First complete retainer check saved");
+StorageCache.Replace(storage, Snapshot(200, "retainer:1:bags", new StoredItem { ItemId = 20, Quantity = 1 }));
+var merged = StorageCache.Merge([], storage, 100)!;
+Check(merged.Count == 1 && merged[0].ItemId == 10, "Storage ownership isolated to logged-in character");
+Check(merged[0].LastCheckedUtc == checkedAt && merged[0].Location.Contains("saved"), "Saved source and check time preserved for ownership UI");
+Check(!LootMatcher.MissingItems(lootSets, "BRD", true, merged).Contains(10), "Saved retainer gear suppresses missing loot glow away from the bell");
+Check(GearMatcher.Match([targetA], merged)[0].Melds!.IsExact, "Retainer materia preserved in saved ownership");
+Check(StorageCache.Merge(null, storage, 100) == null, "Unreadable live inventory stays unknown with cached storage");
+Check(StorageCache.Merge([], storage, 0) == null, "No character means no storage ownership");
+Check(StorageCache.Merge([], storage, 300)!.Count == 0, "Unvisited character never inherits another character's gear");
+Check(!StorageCache.Replace(storage, Snapshot(100, "retainer:1:bags", new StoredItem { ItemId = 10, Quantity = 1, Materia = [1] })), "Unchanged scans avoid repeated local saves");
+var refreshed = Snapshot(100, "retainer:1:bags", new StoredItem { ItemId = 10, Quantity = 1, Materia = [1] });
+refreshed.CheckedAtUtc = checkedAt.AddSeconds(31);
+Check(StorageCache.Replace(storage, refreshed), "Revisits refresh last checked timestamp");
+var explicitRefresh = Snapshot(100, "retainer:1:bags", new StoredItem { ItemId = 10, Quantity = 1, Materia = [1] });
+explicitRefresh.CheckedAtUtc = checkedAt.AddSeconds(32);
+Check(StorageCache.Replace(storage, explicitRefresh, true), "Explicit check forces a fresh timestamp");
+Check(StorageCache.Replace(storage, Snapshot(100, "retainer:1:bags")), "Verified empty storage replaces old contents");
+Check(StorageCache.Merge([], storage, 100)!.Count == 0, "Removed gear no longer counts after rescanning");
+Check(storage.Count(s => s.CharacterId == 100 && s.Key == "retainer:1:bags") == 1, "Rechecks replace snapshots instead of duplicating copies");
+StorageCache.Replace(storage, Snapshot(100, "dresser", new StoredItem { ItemId = 10, Quantity = 1, Materia = [] }));
+StorageCache.Replace(storage, Snapshot(100, "armoire", new StoredItem { ItemId = 1, Quantity = 1, Materia = [] }));
+var wardrobe = StorageCache.Merge([new OwnedItem(1, 1, "Bag", false)], storage, 100)!;
+Check(GearMatcher.Match(rings, wardrobe).All(s => s.Match != null), "Live and armoire copies combine for a two-ring target");
+Check(GearMatcher.Match([new GearPiece { ItemId = 10, Materia = [] }], wardrobe)[0].Melds!.IsExact, "Dresser gear records known empty melds");
+var serializedStorage = System.Text.Json.JsonSerializer.Serialize(storage);
+var reloadedStorage = System.Text.Json.JsonSerializer.Deserialize<List<StorageSnapshot>>(serializedStorage)!;
+Check(StorageCache.Merge([], reloadedStorage, 100)!.Count == 2, "Storage contents survive local serialization and reload");
+Check(StorageCache.Merge([], reloadedStorage, 200)!.Single().ItemId == 20, "Character isolation survives local serialization");
+storage.RemoveAll(s => s.CharacterId == 100 && s.Key == "dresser");
+Check(!StorageCache.Merge([], storage, 100)!.Any(i => i.ItemId == 10), "Forgetting stale storage removes its ownership contribution");
+Reject(() => StorageCache.Replace(storage, Snapshot(0, "dresser")), "Storage scan without character identity rejected");
+Reject(() => StorageCache.Replace(storage, Snapshot(100, "bad", new StoredItem { ItemId = 0, Quantity = 1 })), "Invalid storage entries cannot erase a saved check");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

@@ -29,9 +29,13 @@ internal static class InventoryReader
 
     // Called only from the Dalamud framework thread; never from the HTTP worker.
     public static List<OwnedItem>? Read(IGameInventory inventory, IDataManager data)
+        => ReadContainers(Containers, inventory, data);
+
+    internal static List<OwnedItem>? ReadContainers(IEnumerable<(InventoryType Type, string Label, bool Equipped)> containers,
+        IGameInventory inventory, IDataManager data)
     {
         var result = new List<OwnedItem>();
-        foreach (var (type, label, equipped) in Containers)
+        foreach (var (type, label, equipped) in containers)
         {
             var slots = inventory.GetInventoryItems((GameInventoryType)type);
             // An empty container still has slots. No slots means unavailable, not missing gear.

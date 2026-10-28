@@ -27,17 +27,28 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 - Compare melded materia against the imported target by type and grade, including duplicate materia and all five overmeld slots. Hover the Materia column to see required, current, missing and extra melds. Slot order is ignored.
 - Prefer correctly melded owned copies when duplicate gear exists. Use **Needs work only** to include both missing gear and incorrect or unknown melds.
 - Save target sets and per-job selection across sessions. Reimporting the same link refreshes its saved sets.
+- Save per-character checks of retainer bags/equipped gear, the glamour dresser (including expanded outfit pieces), and the armoire. Saved items count as owned after those windows close and across plugin/game restarts.
 - Subtle blue glow around wanted, missing item icons in the game's standard loot-roll window, even while the checklist is closed. Enabled by default for every saved set of the current job; untick **Loot: current job only** to include other jobs. Disable with **Blue glow on missing set items**.
 
-The loot glow appears only for items required by a saved set and missing from equipped gear, bags and Armoury Chest. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown inventory suppresses the glow. Retainers and other excluded storage are not counted.
+The loot glow appears only for items required by a saved set and missing from live inventory and the current character's saved storage checks. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown live inventory suppresses the glow.
 
 It appears only while Need or Greed is available and clears once you roll, pass, the item resolves, or the loot window closes. It uses exact gear item IDs: coffers and exchange tokens are not mapped to their rewards. The glow is a click-through visual overlay; it does not select or roll on items.
 
-**Missing** means absent from the checked storage. Retainers, saddlebags, glamour storage, and other characters are excluded. HQ quality, food, and relic stat allocations are not validated. Loose materia in bags does not count as melded materia. No character or inventory data is sent to XIVGear; imports only send the supplied link to its public API.
+**Missing** means absent from checked live storage and saved checks. Saddlebags, items listed for sale, and other characters are excluded. HQ quality, food, and relic stat allocations are not validated. Loose materia in bags does not count as melded materia. No character or inventory data is sent to XIVGear; imports only send the supplied link to its public API.
+
+## Check storage once, remember it locally
+
+1. Update GearScout, then manually open each retainer's inventory at a summoning bell. Leave it open for a few seconds until loading completes. Open retainer equipment too if it has not loaded with the bags.
+2. Manually open your glamour dresser and armoire, allowing each to finish loading.
+3. In `/gearscout`, expand **Saved storage checks** to see the sources, item counts and last-checked times. **Scan open storage** requests an immediate recheck; completed checks also save automatically while those stores are open.
+
+The full loaded contents are saved in Dalamud's local GearScout configuration and associated with the current character. Retainers have independent bag/equipment checks. A new check replaces the old contents of that source, including when it becomes empty; unopened or partially loaded storage does not erase a previous check. Retainer materia is retained, and dresser/armoire items are treated as unmelded.
+
+These are last-known contents, not a remote live inventory. Reopen storage after moving/removing items, especially if changes happened with GearScout disabled. Stale checks can otherwise count a removed item, or count a transferred copy twice. **Forget** removes an old source from ownership calculations; an open storage source will be detected again. Sources not yet visited have no saved ownership data. Nothing is uploaded to GitHub or any inventory service.
 
 After updating from 0.1.0, click **Refresh from link** on existing sets to load their materia targets. Old saved sets remain available and show unknown materia until refreshed. An explicitly empty target expects an unmelded item; extra materia is shown as a mismatch.
 
-Compilation, importer checks, inventory/materia matching, loot-matching rules, and the supplied live XIVGear URL have been verified. In-game loading, inventory/job transitions, and the loot glow's alignment, clipping and appearance still require manual verification.
+Compilation, importer checks, inventory/materia matching, loot rules, saved-storage replacement/persistence/character isolation, and the supplied live XIVGear URL have been verified. Native storage reads and transfers, in-game loading, inventory/job transitions, and the loot glow's alignment, clipping and appearance still require manual verification.
 
 ## Build and test
 

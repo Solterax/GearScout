@@ -10,4 +10,5 @@ public sealed class Configuration : IPluginConfiguration
     public Dictionary<string, Guid> SelectedByJob { get; set; } = [];
     public bool HighlightLoot { get; set; } = true;
     public bool LootCurrentJobOnly { get; set; } = true;
+    public List<StorageSnapshot> StorageSnapshots { get; set; } = [];
 }

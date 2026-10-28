@@ -28,7 +28,7 @@ internal sealed class MainWindow : Window
     public override void Draw()
     {
         ImGui.TextUnformatted("XIVGEAR  /  GEAR CHECKLIST");
-        ImGui.TextColored(Muted, "Equipped gear + bags + Armoury Chest. Updates every second.");
+        ImGui.TextColored(Muted, "Equipped gear + bags + Armoury Chest + saved storage checks.");
         var highlightLoot = plugin.Config.HighlightLoot;
         if (ImGui.Checkbox("Blue glow on missing set items", ref highlightLoot))
         {
@@ -43,7 +43,8 @@ internal sealed class MainWindow : Window
             SaveSafely();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Highlights items still missing from a saved set for this job.\nChecks equipped gear, bags and Armoury Chest. An owned copy counts regardless of melds.\nUntick to include other jobs. Coffers and exchange tokens are not mapped.");
+            ImGui.SetTooltip("Highlights items still missing from a saved set for this job.\nIncludes saved retainer, dresser and armoire checks for this character.\nAn owned copy counts regardless of melds. Untick to include other jobs.\nCoffers and exchange tokens are not mapped.");
+        DrawStorage();
         ImGui.Spacing();
         ImGui.SetNextItemWidth(-95);
         ImGui.InputTextWithHint("##link", "Paste an xivgear.app gear set or sheet link", ref link, 4096);
@@ -132,7 +133,7 @@ internal sealed class MainWindow : Window
         ImGui.TextColored(Muted, "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
         if (selected.Pieces.Any(p => p.Materia == null))
             ImGui.TextColored(Amber, "Materia targets unavailable for some pieces. Click Refresh from link to update an older import.");
-        ImGui.TextColored(Muted, "Retainers, saddlebag and glamour storage are not searched.");
+        ImGui.TextColored(Muted, "Retainers, dresser and armoire use last checked contents. Reopen them after changes.");
 
         if (!ImGui.BeginTable("gear", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
                 ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY, new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y)))) return;
@@ -159,8 +160,42 @@ internal sealed class MainWindow : Window
             DrawMateria(status);
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(status.Match?.Location ?? "Not found");
+            if (status.Match?.LastCheckedUtc is { } checkedAt && ImGui.IsItemHovered())
+                ImGui.SetTooltip($"{status.Match.Location}\nLast checked: {checkedAt.ToLocalTime():g}\nSaved locally for this character. Reopen this storage to refresh it.");
         }
         ImGui.EndTable();
+    }
+
+    private void DrawStorage()
+    {
+        if (!ImGui.CollapsingHeader("Saved storage checks")) return;
+        ImGui.TextWrapped("Manually open each retainer's inventory, the glamour dresser and the armoire. GearScout saves complete loaded contents automatically and refreshes them while open.");
+        if (ImGui.Button("Scan open storage")) plugin.RequestStorageScan();
+        ImGui.TextWrapped(plugin.StorageStatus);
+        ImGui.TextColored(Muted, "Last-known contents can become stale. Forget old checks or reopen storage to refresh.");
+        var snapshots = plugin.Config.StorageSnapshots.Where(s => s.CharacterId == plugin.CharacterId).OrderBy(s => s.Name).ToArray();
+        if (snapshots.Length == 0) ImGui.TextUnformatted("No storage checked for this character yet.");
+        if (ImGui.BeginTable("storage", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, new Vector2(0, snapshots.Length == 0 ? 35 : 155)))
+        {
+            ImGui.TableSetupColumn("Storage", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Items", ImGuiTableColumnFlags.WidthFixed, 55);
+            ImGui.TableSetupColumn("Last checked", ImGuiTableColumnFlags.WidthFixed, 155);
+            ImGui.TableSetupColumn("##action", ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableHeadersRow();
+            foreach (var snapshot in snapshots)
+            {
+                ImGui.TableNextRow();
+                ImGui.TableNextColumn();
+                ImGui.TextWrapped(snapshot.Name);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(snapshot.Items.Sum(i => (long)i.Quantity).ToString());
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(snapshot.CheckedAtUtc.ToLocalTime().ToString("g"));
+                ImGui.TableNextColumn();
+                if (ImGui.SmallButton($"Forget##{snapshot.Key}")) plugin.ForgetStorage(snapshot.Key);
+            }
+            ImGui.EndTable();
+        }
     }
 
     private void DrawMateria(PieceStatus status)

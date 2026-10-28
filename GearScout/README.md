@@ -1,4 +1,4 @@
-# GearScout 0.3.1
+# GearScout 0.4.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -18,18 +18,19 @@ Switch to Bard to see this example. When you switch jobs, only sets whose import
 
 - Checks equipped items, all four inventory bags, and the Armoury Chest of the logged-in character.
 - Updates approximately once per second while the window is open; login, loading and character/job changes clear the old snapshot.
-- **Equipped** means a matching copy is worn; **Owned** means it is in a checked bag or Armoury Chest; **Missing** means absent from the checked storage.
+- **Equipped** means a matching copy is worn by the player; **Owned** includes live bags/Armoury Chest and saved retainer, glamour dresser and armoire checks for this character; **Missing** means absent from the checked storage.
 - Duplicate items require enough physical copies. One ring cannot satisfy two ring slots. The side on which a matching ring is worn does not matter.
 - HQ and NQ copies both count. Food, relic stat allocations, and item quality are not validated.
 - Materia is compared by item ID (type and grade), with duplicates counted separately. Order does not matter, and all five meld slots are checked. Exact matches require no missing or extra materia.
 - Hover the Materia column to see expected, current, missing and extra melds. Loose materia does not count as melded gear. The matcher allocates owned copies across the set to prefer correct melds, including duplicate rings.
 - Existing sets from 0.1.0 have unknown meld targets until you click **Refresh from link**. A missing or unreadable materia list is never shown as correct. An explicit empty target expects no materia.
 - Matching direct gear drops receive a soft blue icon glow in the standard Need/Greed window. All saved sets for the current job are checked, even when the checklist is closed. Use the loot settings to disable it or include other jobs.
-- The glow requires an item to be wanted by a saved set and missing from equipped gear, bags and Armoury Chest. Owned gear suppresses it regardless of materia; a set needing two identical rings still requires two copies, while alternative saved sets can reuse one owned copy. Ownership refreshes once per second with the checklist closed while highlighting is enabled. Unknown inventory suppresses the glow.
+- The glow requires an item to be wanted by a saved set and missing from live inventory and the character's saved storage checks. Owned gear suppresses it regardless of materia; a set needing two identical rings still requires two copies, while alternative saved sets can reuse one owned copy. Ownership refreshes once per second with the checklist closed while highlighting is enabled. Unknown live inventory suppresses the glow.
 - It is shown only for available Need/Greed rolls, and does not automate rolling. Coffers and exchange tokens are not mapped to their rewards.
-- Retainers, chocobo saddlebags, glamour dresser, armoire and other characters are excluded. An item in those places can appear as missing. Move it to your bags or Armoury Chest to have it counted.
+- Manually open each retainer inventory, the glamour dresser and the armoire, then wait for loading. Complete contents save automatically, even with the checklist closed. **Saved storage checks** shows per-source timestamps and provides **Scan open storage** and **Forget** controls. Retainer bags and equipped gear are independent sources; selling/market listings are excluded. Dresser data includes expanded outfit pieces; glamour plates are not physical ownership.
+- Saved checks are last-known contents. Reopen storage after changes; stale checks can count removed items or duplicate a transferred copy. Unvisited stores, chocobo saddlebags and other characters are excluded. Retainer materia is saved; dresser and armoire contents have no melds.
 - Custom/negative XIVGear item IDs are unsupported. Invalid imports report an error and leave the previous saved sets intact.
-- Saved target sets are shared by the plugin configuration; ownership is always read from the current character and is never persisted.
+- Saved target sets are shared by the plugin configuration. Live inventory is read from the current character; storage checks persist locally and are isolated by character content ID and source key.
 
 ## Build from source
 
@@ -51,7 +52,7 @@ dotnet run --project Tests/GearScout.Tests.csproj -- --live
 
 ## Validation status
 
-Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, invalid links, duplicate rings, materia type/grade/count checks, overmelds, copy allocation, saved-target serialization and loot matching/eligibility. The supplied Bard URL has also been tested against the live API. In-game loading, glow appearance/alignment and live inventory/job transitions still need manual verification; compilation does not prove those behaviours.
+Compiled against the installed Dalamud 15.0.3.9 assemblies. Automated checks cover imports, materia, loot rules, saved-storage replacement, serialization, character separation, cached ownership and invalid scans. The supplied Bard URL has also been tested against the live API. Native storage readiness/reads/transfers, in-game loading and glow appearance still need manual verification; compilation does not prove those behaviours.
 
 Manual acceptance checks:
 
@@ -70,12 +71,18 @@ Manual acceptance checks:
 13. Move and rescale the loot window; check glow alignment and clipping. Hide the game UI and close the loot window to confirm no stale glow remains. Verify mouse and controller loot controls work normally.
 14. Disable the glow, include other jobs, remove a target set and change jobs; verify the highlighted items follow the settings immediately. Unload the plugin while the loot window is open and confirm no highlight remains.
 15. With the checklist closed, verify an owned wanted item does not glow. Move it out of checked storage and verify the glow appears after the ownership refresh; return it and verify it clears. Wrong melds on an owned copy must not trigger a glow. Test a two-identical-ring target with one and then two owned copies.
+16. Open two different retainers' inventories/equipment, allowing a few seconds for loading. Verify independent sources and item counts; rapidly switch retainers or interrupt loading and ensure no source is misattributed or replaced by incomplete data.
+17. Open the dresser and armoire. Check gear on another page/filter, expanded outfit pieces and an empty source. Verify counts against the game and correct item IDs. Reload GearScout and zone away: saved ownership should persist for this character only.
+18. Move target gear between a retainer/dresser/armoire and player bags while the storage stays open. Verify refreshed snapshots remove withdrawn items and combine with live bags without persisting duplicate copies. Leave a source empty and verify the old saved items are removed.
+19. Check cached retainer materia and a dresser/armoire unmelded target. Hover the location to see last-checked time. Forget a closed source and verify its gear no longer contributes. Check loot-glow suppression for a wanted item held only in saved storage.
 
 ## Implementation and references
 
 `Plugin.cs` handles lifecycle and framework-thread updates. `MainWindow.cs` draws the UI. `InventoryReader.cs` uses Dalamud's inventory service. `XivGearImporter.cs` fetches and parses sets without game access. `Models.cs` contains copy-aware matching. HTTP work is asynchronous; game access and configuration changes run on the framework thread. Importing sends the supplied link to XIVGear's public API; no character or inventory data is sent.
 
 `LootMatcher.cs` implements job scope, item-ID normalization and conservative roll-eligibility matching. `LootHighlighter.cs` reads the current NeedGreed list and live loot slots on each draw, finds visible item-icon bounds and draws a soft blue ImGui outline. It retains no native pointers, changes no game nodes, adds no input handlers and suppresses highlights when the UI is hidden. Because it is an ImGui overlay, it shares ImGui's foreground layering relative to native windows.
+
+`StorageScanner.cs` reads only manually opened, loaded sources after a short stabilization delay; retainer identity must agree with ItemOrderModule and every container in a snapshot must be loaded. Dresser reads use the complete agent item array after population, and armoire reads require loaded Cabinet state. No requests, withdrawal actions or hooks are sent to the game. `StorageCache.cs` replaces complete source snapshots and combines them with live inventory for the current character. Native data unavailable at a location leaves its previous saved snapshot unchanged. Changed checks save immediately; unchanged timestamps refresh at most every 30 seconds. Save failures retry and are surfaced in the storage status.
 
 - XIVGear API: https://github.com/xiv-gear-planner/gear-planner/blob/main/API_DOC.md
 - Dalamud plugin development: https://dalamud.dev/plugin-development/getting-started/
