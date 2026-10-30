@@ -13,7 +13,7 @@ internal sealed class MainWindow : Window
     private static readonly Vector4 Amber = new(1, 0.73f, 0.35f, 1);
     private static readonly Vector4 Muted = new(0.65f, 0.7f, 0.76f, 1);
 
-    public MainWindow(Plugin plugin) : base("GearScout — Gear sets###GearScoutMain")
+    public MainWindow(Plugin plugin) : base($"GearScout v{typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "unknown"} — Gear sets###GearScoutMain")
     {
         this.plugin = plugin;
         Size = new Vector2(1000, 650);

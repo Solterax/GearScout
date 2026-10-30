@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.11.1</Version>
+    <Version>0.11.2</Version>
     <Author>Solterax</Author>
     <RepoUrl>https://github.com/Solterax/GearScout</RepoUrl>
     <Name>GearScout</Name>
