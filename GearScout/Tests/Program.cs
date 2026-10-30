@@ -403,6 +403,135 @@ retainerScan.Stop();
 Check(retainerScan.Tick(waiting with { ListReady = true }, 1) == RetainerScanAction.None && !retainerScan.Running,
     "Stop button prevents further navigation");
 
+MateriaOption TestMateria(uint id, bool restricted = false, uint param = 27, int value = 10, uint level = 1) =>
+    new(id, $"Materia {id}", param, value, level, restricted ? [0.12, 0, 0, 0] : [0.12, 0.06, 0.03, 0.02],
+        restricted ? [0.17, 0, 0, 0] : [0.17, 0.10, 0.07, 0.05], restricted ? 0.4 : 0.8);
+var materiaRules = new Dictionary<uint, MateriaOption> { [1] = TestMateria(1), [2] = TestMateria(2, true), [3] = TestMateria(3), [4] = TestMateria(4, level: 999) };
+var accessoryRules = new MeldGearRules(1, true, 770, new Dictionary<uint, int>(), new Dictionary<uint, int> { [27] = 200 });
+var armorRules = accessoryRules with { GuaranteedSlots = 2 };
+OwnedItem MeldCopy(uint[] melds, int slot = 0, bool hq = true) => new(100, 1, "Bag 1", false, melds)
+    { Container = 0, InventorySlot = slot, HighQuality = hq };
+GearPiece MeldTarget(params uint[] melds) => new() { Slot = "Head", ItemId = 100, Materia = melds.ToList() };
+Check(MeldPlanner.Rate(accessoryRules, materiaRules[1], true, 4) == 0.05 &&
+    MeldPlanner.Rate(armorRules, materiaRules[1], true, 4) == 0.07, "One-slot accessories reach 5% while two-slot armor ends at 7%");
+Check(MeldPlanner.Rate(accessoryRules, materiaRules[1], false, 4) == 0.02, "NQ quality changes the final accessory rate to 2%");
+Check(MeldPlanner.Rate(armorRules, materiaRules[2], true, 1) == 1 &&
+    MeldPlanner.Rate(armorRules, materiaRules[2], true, 2) == 0.17 &&
+    MeldPlanner.Rate(armorRules, materiaRules[2], true, 3) == 0, "Restricted grades fit guaranteed and first advanced slots only");
+Check(MeldPlanner.Rate(accessoryRules with { Advanced = false }, materiaRules[1], true, 1) == 0 &&
+    MeldPlanner.Rate(accessoryRules with { GuaranteedSlots = 0 }, materiaRules[1], true, 0) == 0,
+    "Items forbidding advanced melds or without sockets cannot be overmelded");
+Check(MeldPlanner.Rate(armorRules, materiaRules[4], true, 0) == 0, "Materia minimum item level is enforced even for guaranteed slots");
+var retained = MeldPlanner.Build(MeldTarget(1, 2), MeldCopy([2, 1]), armorRules, materiaRules);
+Check(retained.Valid && retained.Actions.Count == 0 && retained.Preserved == 2, "Equivalent target order preserves existing valid melds without removals");
+var rebuild = MeldPlanner.Build(MeldTarget(1, 2), MeldCopy([3, 1]), armorRules, materiaRules);
+Check(rebuild.Valid && rebuild.Preserved == 0 && rebuild.Actions.Take(2).Select(a => a.MateriaId).SequenceEqual(new uint[] {1, 3}) &&
+    rebuild.Actions.Take(2).All(a => a.Kind == MeldActionKind.Retrieve), "Correct later materia is removed first when it blocks an incorrect early meld");
+Check(rebuild.Actions[0].Chance == 0.8 && rebuild.Actions[0].Before.SequenceEqual(new uint[] {3, 1}) && rebuild.Actions[0].After.SequenceEqual(new uint[] {3}),
+    "Removal plan records recovery chance and exact before/after states");
+var prefixPlan = MeldPlanner.Build(MeldTarget(1, 1, 2), MeldCopy([1, 3]), accessoryRules, materiaRules);
+Check(prefixPlan.Valid && prefixPlan.Preserved == 1 && prefixPlan.Actions[1].MateriaId == 2 && prefixPlan.Actions[1].Chance == 0.17,
+    "Planner preserves usable prefix and reserves first overmeld for restricted materia");
+var rearrangedPrefix = MeldPlanner.Build(MeldTarget(1, 2, 2), MeldCopy([1]), accessoryRules, materiaRules);
+Check(rearrangedPrefix.Valid && rearrangedPrefix.Preserved == 0 && rearrangedPrefix.Actions[0].Kind == MeldActionKind.Retrieve &&
+    rearrangedPrefix.Actions.Skip(1).Take(2).All(a => a.MateriaId == 2),
+    "A correct prefix is rebuilt when needed to fit restricted grades into legal positions");
+var mixedRates = new Dictionary<uint, MateriaOption>(materiaRules) { [5] = TestMateria(5) with { HqRates = [0.90, 0.48, 0.28, 0.16] } };
+var optimizedOrder = MeldPlanner.Build(MeldTarget(5, 1), MeldCopy([]), accessoryRules, mixedRates);
+Check(optimizedOrder.Actions[0].MateriaId == 1 && optimizedOrder.Actions[1].MateriaId == 5,
+    "Lowest-consumption legal order reserves a guaranteed socket for harder-to-overmeld materia");
+Check(!MeldPlanner.Build(MeldTarget(2, 2, 2), MeldCopy([]), accessoryRules, materiaRules).Valid,
+    "Impossible restricted-grade accessory plan is rejected");
+Check(!MeldPlanner.Build(MeldTarget(1, 1), MeldCopy([]), accessoryRules with { Advanced = false }, materiaRules).Valid,
+    "Too many targets for guaranteed-only gear are rejected");
+Check(!MeldPlanner.Build(MeldTarget(999), MeldCopy([]), armorRules, materiaRules).Valid &&
+    !MeldPlanner.Build(MeldTarget(1), null, armorRules, materiaRules).Valid, "Unknown materia and missing gear produce incomplete plans");
+Check(!MeldPlanner.Build(new() { ItemId = 100 }, MeldCopy([]), armorRules, materiaRules).Valid &&
+    !MeldPlanner.Build(MeldTarget(1, 1, 1, 1, 1, 1), MeldCopy([]), armorRules, materiaRules).Valid,
+    "Unspecified targets and more than five targets cannot generate actions");
+Check(!MeldPlanner.Build(MeldTarget(1), MeldCopy([]) with { HighQuality = null }, armorRules, materiaRules).Valid &&
+    !MeldPlanner.Build(MeldTarget(1), MeldCopy([]) with { Materia = null }, armorRules, materiaRules).Valid,
+    "Unknown quality or existing melds block a plan instead of guessing");
+Check(MeldPlanner.Build(MeldTarget(), MeldCopy([1, 2]), armorRules, materiaRules).Actions.All(a => a.Kind == MeldActionKind.Retrieve),
+    "An explicitly empty target removes all existing materia");
+Check(MeldPlanner.Build(MeldTarget(1), MeldCopy([]), armorRules with { StatCaps = new Dictionary<uint, int> { [27] = 5 } }, materiaRules).Warnings.Any(w => w.Contains("wastes 5")),
+    "Planner flags target stats exceeding the item cap");
+Check(MeldPlanner.Build(MeldTarget(1), MeldCopy([]), armorRules with { StatCaps = new Dictionary<uint, int>() }, materiaRules).Warnings.Any(w => w.Contains("unknown")),
+    "Unknown stat-cap data is explicitly labeled");
+var geometric = MeldProbability.Distribution([0.2]);
+Check(MeldProbability.Quantile(geometric, 0.90) == 11 && MeldProbability.Quantile(geometric, 0.95) == 14,
+    "20% single meld needs 11 attempts for 90% and 14 attempts for 95%");
+var certain = MeldProbability.Distribution([1, 1, 1]);
+Check(certain.Length == 4 && certain[3] == 1 && MeldProbability.Quantile(certain, 0.99) == 3,
+    "Guaranteed meld budgets equal the exact number of remaining melds");
+var repeatedGeometric = MeldProbability.Distribution([0.5, 0.5]);
+Check(Math.Abs(repeatedGeometric[2] - 0.25) < 1e-12 && Math.Abs(repeatedGeometric[3] - 0.25) < 1e-12,
+    "Same-type multiple melds use the full attempt-count convolution");
+Check(Math.Abs(MeldProbability.Distribution([1, 0.2])[2] - 0.2) < 1e-12, "Mixed guaranteed and advanced attempts combine correctly");
+Reject(() => MeldProbability.Distribution([0]), "Impossible success probabilities are rejected");
+Reject(() => MeldProbability.Quantile(geometric, 1), "Finite 100% budgets for random melds are not promised");
+OwnedItem Loose(uint id, int qty, int slot = 1) => new(id, qty, "Bag 1", false, []) { Container = 0, InventorySlot = slot, HighQuality = false };
+var twoTypes = MeldPlanner.Build(MeldTarget(1, 2), MeldCopy([]), accessoryRules, materiaRules);
+var shopping = MeldProbability.Budget([twoTypes], [Loose(1, 2), new(2, 25, "Retainer: Test / bags (saved)", false, [], DateTimeOffset.UtcNow)], 0.95);
+Check(shopping.CompletePlan && shopping.Items.Single(i => i.MateriaId == 2).Retainers == 25 && shopping.Items.Single(i => i.MateriaId == 2).Bags == 0,
+    "Shopping separates bag supply from saved retainer supply");
+Check(shopping.CompletionChance == 0 && shopping.Items.Single(i => i.MateriaId == 2).Additional > 0,
+    "Retainer stock is not counted as usable bag stock for completion chance");
+var joint = shopping.Items.Select(i =>
+{
+    var dist = MeldProbability.Distribution(twoTypes.Actions.Where(a => a.Kind == MeldActionKind.Meld && a.MateriaId == i.MateriaId).Select(a => a.Chance).ToArray());
+    return dist.Take(i.Budget + 1).Sum();
+}).Aggregate(1.0, (a, b) => a * b);
+Check(joint >= 0.95, "Per-type budgets jointly reach the requested whole-plan confidence");
+var purchaseAfterRemovals = MeldProbability.Budget([rebuild], [], 0.95);
+Check(purchaseAfterRemovals.Items.Sum(i => i.Minimum) == 2 && purchaseAfterRemovals.Items.Sum(i => i.Budget) == 2,
+    "Potential retrieval refunds are not subtracted from confirmed shopping requirements");
+Check(!MeldProbability.Budget([MeldPlanner.Build(MeldTarget(1), null, armorRules, materiaRules)], [], 0.95).CompletePlan,
+    "Invalid pieces cannot be represented as a complete whole-set estimate");
+var guidePlan = MeldPlanner.Build(MeldTarget(1), MeldCopy([]), armorRules, materiaRules);
+var guide = new MeldGuide();
+guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Observe(100, true, [MeldCopy([1]), Loose(1, 4)], 1);
+Check(!guide.Running && guide.Completed == 1 && guide.Consumed == 1 && guide.Status.Contains("complete"),
+    "Guidance observes the expected success and counts consumed materia");
+var advancedGuidePlan = MeldPlanner.Build(MeldTarget(1, 1), MeldCopy([1]), accessoryRules, materiaRules);
+guide.Start(100, [advancedGuidePlan], [MeldCopy([1]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 2 }, 2, 0);
+guide.Observe(100, true, [MeldCopy([1]), Loose(1, 4)], 1);
+Check(guide.Running && guide.Completed == 0 && guide.Consumed == 1, "Failed overmeld consumes budget while leaving the current step pending");
+guide.Observe(100, true, [MeldCopy([1]), Loose(1, 3)], 2);
+Check(!guide.Running && guide.Consumed == 2 && guide.Status.Contains("limit", StringComparison.OrdinalIgnoreCase),
+    "Guidance stops after exhausted failed-attempt budget");
+guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Observe(100, true, [MeldCopy([], slot: 9), Loose(1, 5)], 1);
+Check(!guide.Running && guide.Status.Contains("moved"), "Moved physical gear stops guidance instead of selecting another copy");
+guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Observe(100, true, [MeldCopy([3]), Loose(1, 4)], 1);
+Check(!guide.Running && guide.Status.Contains("unexpected"), "Unexpected materia changes stop the guided sequence");
+foreach (var state in new[] { (Owner: 200UL, Ready: true), (Owner: 100UL, Ready: false) })
+{
+    guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+    guide.Observe(state.Owner, state.Ready, [MeldCopy([]), Loose(1, 5)], 1);
+    Check(!guide.Running, "Character and loading changes stop melding guidance");
+}
+guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Stop(); guide.Observe(100, true, [MeldCopy([1])], 1);
+Check(!guide.Running && guide.Completed == 0, "Stopped guidance does not continue observing actions");
+guide.Start(100, [guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Observe(100, true, [MeldCopy([]), Loose(1, 5)], 180001);
+Check(!guide.Running && guide.Status.Contains("timed out"), "Inactive guidance times out");
+guide.Start(100, [guidePlan], [MeldCopy([])], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+guide.Observe(100, true, [MeldCopy([])], 1);
+Check(!guide.Running && guide.Status.Contains("unavailable"), "Missing bag materia stops guidance");
+Reject(() => guide.Start(100, [guidePlan, guidePlan], [MeldCopy([])], new Dictionary<uint, int>(), 3, 0),
+    "One physical gear copy cannot be guided for two target slots");
+Reject(() => guide.Start(100, [MeldPlanner.Build(MeldTarget(1), MeldCopy([]) with { LastCheckedUtc = DateTimeOffset.UtcNow }, armorRules, materiaRules)], [], new Dictionary<uint, int>(), 3, 0),
+    "Saved storage gear cannot be used as a live guidance target");
+var qualitySnapshot = Snapshot(100, "retainer:test:bags", new StoredItem { ItemId = 100, Quantity = 1, HighQuality = true, Materia = [2, 1] });
+var qualityReload = System.Text.Json.JsonSerializer.Deserialize<StorageSnapshot>(System.Text.Json.JsonSerializer.Serialize(qualitySnapshot))!;
+var savedQuality = StorageCache.Merge([], [qualityReload], 100)!.Single();
+Check(savedQuality.HighQuality == true && savedQuality.Materia!.SequenceEqual(new uint[] {2, 1}) && !savedQuality.IsLive,
+    "Stored quality and materia order survive persistence without creating a fake live copy");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

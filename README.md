@@ -31,7 +31,7 @@ Use **Edit set** to change or rename a local set, or click an item name directly
 
 The builder and search popup have fixed dimensions; scrolling stays inside their item lists.
 
-Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces have no specified materia target; unchanged imported-copy pieces retain their meld plans. Materia-plan editing is not part of this editor.
+Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces initially have no specified materia target; use **Targets** to choose up to five materia, including repeats. Unchanged imported-copy pieces retain their meld plans. Empty targets explicitly request no melds.
 
 ## Build a job-independent glam set
 
@@ -65,6 +65,20 @@ The loot current-job-only option has been removed. Old saved values no longer af
 For example: `[GearScout] Wanted loot dropped: Example Hat — for Bard plan (BRD), Hat collection (Glam).` A later acquisition produces an **Obtained** message. Each chest item is announced once, even if the loot window is reopened. Drop notices name only sets still missing the item, using the same ownership/copy rules as the glow.
 
 The first complete inventory scan after login, reload or loading establishes a silent baseline. Existing inventory, cached storage items, extra copies of a known item and set edits do not produce acquisition messages. Checking storage is silent; transfers while storage is open or shortly after closing are also suppressed. During a monitored character session, an item already observed as owned is not announced again if it is moved, removed and reacquired. Missing or unvisited storage is still limited by the last-known ownership checks described below. These messages appear only in your local chat; GearScout does not post to party or other players.
+
+## Melding planner
+
+Select a normal gear set and click **Melding planner**. Glam lists do not use melding plans.
+
+1. Select the exact copy for each target slot. The selector shows location, inventory slot and HQ/NQ quality. Different target slots must use different physical copies. Missing gear, unspecified targets, unknown quality/melds and impossible targets are flagged; older storage checks may need reopening to capture quality.
+2. Use **Edit targets** to choose materia by name or item ID, including duplicates. Imported edits create a local copy; local edits update that set. Targets can also be edited through **Targets** in the set builder.
+3. Review the bottom-first removal/rebuild steps, recovery percentages and melding success rates. The planner keeps the longest legal existing prefix and chooses a remaining order with the lowest expected attempt count. It handles one-slot accessories, guaranteed-only gear, HQ/NQ rates, minimum item levels and restricted overmeld grades using installed game data. It flags wasted stats and unknown stat caps. Cap calculations use base item/HQ stats; custom relic allocations are not included.
+4. Choose a **90%, 95% or 99% whole-plan budget**. The shopping list separates bag stock and saved retainer stock, minimum and average attempts, confidence budgets and additional materia to obtain. Potential retrieval refunds are listed separately and credited only after they actually reach bags. Missing or invalid pieces make the estimate explicitly partial. Retainer quantities are last-known; withdraw them to make them usable.
+5. Set a total material limit for this guidance session and click **Start guidance**. Use **Open melding window** for the game's meld interface, or Retrieve Materia in the gear's context menu. Perform one action/attempt at a time and wait for the next instruction. The plan, stock and probabilities refresh after inventory changes. **Stop guidance** ends the session and keeps completed changes.
+
+Guidance observes manual in-game actions; it does not confirm melds/retrievals or automate repeated attempts. Its limit is an advisory stop for the guided session, not a lock on the game's own actions. Native batch melding or other inventory changes between observations can exceed that limit or stop the session. Guidance also stops on moved/changed gear, unexpected melds, missing materia, unavailable inventory, character/loading changes, target-set edits or three minutes without progress.
+
+Confidence describes the probability of having enough attempts for the remaining valid plan, assuming independent attempts at the displayed rates and no retrieval refunds. It is not a guarantee. Per-materia-type budgets are allocated so their combined completion probability meets the selected confidence; the displayed chance with bag stock uses the whole plan, rather than applying that confidence separately to each slot.
 
 The loot glow appears only for items required by a saved set and missing from live inventory and the current character's saved storage checks. Owned items suppress the glow regardless of materia. If one set requires two identical rings and you own only one, another copy is still missing; alternative saved sets can share the same owned copy. Ownership refreshes approximately once per second even while the checklist is closed, and unknown live inventory suppresses the glow.
 

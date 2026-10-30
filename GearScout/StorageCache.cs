@@ -5,6 +5,7 @@ public sealed class StoredItem
     public uint ItemId { get; set; }
     public int Quantity { get; set; }
     public List<uint>? Materia { get; set; }
+    public bool? HighQuality { get; set; }
 }
 
 public sealed class StorageSnapshot
@@ -44,10 +45,10 @@ public static class StorageCache
         if (live == null || characterId == 0) return null;
         return live.Concat(snapshots.Where(s => s.CharacterId == characterId)
             .SelectMany(s => s.Items.Select(i => new OwnedItem(i.ItemId, i.Quantity,
-                s.Name + " (saved)", false, i.Materia, s.CheckedAtUtc)))).ToList();
+                s.Name + " (saved)", false, i.Materia, s.CheckedAtUtc) { HighQuality = i.HighQuality }))).ToList();
     }
 
     private static string Fingerprint(IEnumerable<StoredItem> items) => string.Join(";", items.Select(i =>
-        $"{i.ItemId}:{i.Quantity}:" + (i.Materia == null ? "?" : string.Join(",", i.Materia.Order())))
+        $"{i.ItemId}:{i.Quantity}:{i.HighQuality}:" + (i.Materia == null ? "?" : string.Join(",", i.Materia)))
         .Order(StringComparer.Ordinal));
 }

@@ -124,6 +124,7 @@ internal sealed class MainWindow : Window
             ImGui.EndPopup();
         }
 
+        if (!selected.IsGlam && ImGui.Button("Melding planner")) plugin.OpenMelding(selected);
         if (selected.Pieces.Count == 0) ImGui.TextWrapped("This set is empty. Click Edit set to choose gear for its slots.");
         var owned = plugin.Owned;
         if (owned == null)

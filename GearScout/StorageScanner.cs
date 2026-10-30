@@ -152,6 +152,6 @@ internal sealed unsafe class StorageScanner
             if (container == null || !container->IsLoaded || container->Items == null || container->Size <= 0) return null;
         }
         var items = InventoryReader.ReadContainers(types.Select(type => (type, "", false)), inventory, data);
-        return items?.Select(i => new StoredItem { ItemId = i.ItemId, Quantity = i.Quantity, Materia = i.Materia?.ToList() }).ToList();
+        return items?.Select(i => new StoredItem { ItemId = i.ItemId, Quantity = i.Quantity, Materia = i.Materia?.ToList(), HighQuality = i.HighQuality }).ToList();
     }
 }

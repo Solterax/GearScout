@@ -30,6 +30,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly WindowSystem windows = new("GearScout");
     private readonly MainWindow window;
     private readonly SetEditorWindow setEditor;
+    private readonly MeldingWindow meldingWindow;
+    private bool openMeldRequested;
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
     private readonly WantedItemTracker wantedItems = new();
@@ -57,6 +59,8 @@ public sealed class Plugin : IDalamudPlugin
     internal ulong CharacterId => characterId;
     internal string StorageStatus { get; private set; } = "Open each storage location in game to save its contents.";
     internal GearCatalog Catalog { get; }
+    internal MeldData MeldingData { get; }
+    internal MeldGuide MeldingGuide { get; } = new();
     internal RetainerScanController RetainerScan { get; }
     internal bool StorageSavePending => storageSavePending;
 
@@ -72,12 +76,15 @@ public sealed class Plugin : IDalamudPlugin
         }
         window = new MainWindow(this);
         Catalog = new GearCatalog(Data);
+        MeldingData = new MeldData(Data);
+        meldingWindow = new MeldingWindow(this);
         RetainerScan = new RetainerScanController(this);
         setEditor = new SetEditorWindow(this);
         lootHighlighter = new LootHighlighter(this);
         lootHighlighter.Initialize();
         windows.AddWindow(window);
         windows.AddWindow(setEditor);
+        windows.AddWindow(meldingWindow);
         Commands.AddHandler("/gearscout", new CommandInfo(OnCommand) { HelpMessage = "Open XIVGear gear tracking." });
         PluginInterface.UiBuilder.Draw += windows.Draw;
         PluginInterface.UiBuilder.Draw += lootHighlighter.Draw;
@@ -94,6 +101,8 @@ public sealed class Plugin : IDalamudPlugin
     internal void CreateSet() { if (!string.IsNullOrEmpty(CurrentJob)) setEditor.Create(CurrentJob); }
     internal void CreateGlamSet() => setEditor.CreateGlam();
     internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
+    internal void OpenMelding(TrackedSet set) => meldingWindow.Open(set);
+    internal void RequestMeldingWindow() => openMeldRequested = true;
 
     internal void SaveLocalSet(TrackedSet set)
     {
@@ -228,9 +237,11 @@ public sealed class Plugin : IDalamudPlugin
         }
         if (ready) UpdateStorage();
         else wantedItems.Suspend();
+        if (!ready) MeldingGuide.Observe(characterId, false, null, Environment.TickCount64);
+        if (openMeldRequested) { openMeldRequested = false; if (ready) ShowNativeMelding(); }
         RetainerScan.Update(ready);
         // Loot highlighting and chat notifications need fresh ownership with the checklist closed.
-        if (!window.IsOpen && !Config.HighlightLoot && !Config.NotifyWantedItems)
+        if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Config.HighlightLoot && !Config.NotifyWantedItems)
         {
             Owned = null;
             wantedItems.Suspend();
@@ -242,15 +253,28 @@ public sealed class Plugin : IDalamudPlugin
         {
             var live = InventoryReader.Read(Inventory, Data);
             Owned = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
+            MeldingGuide.Observe(characterId, ready, Owned, Environment.TickCount64);
             UpdateWantedNotifications(live);
         }
         catch (Exception ex)
         {
             Owned = null;
             wantedItems.Suspend();
+            MeldingGuide.Stop("Guidance stopped: live inventory is unavailable.");
             nextScan = Environment.TickCount64 + 5000;
             Log.Warning(ex, "Could not read character inventory");
         }
+    }
+
+    private static unsafe void ShowNativeMelding()
+    {
+        try
+        {
+            var module = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule.Instance();
+            var agent = module == null ? null : module->GetAgentByInternalId(FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId.MateriaAttach);
+            if (agent != null) agent->Show();
+        }
+        catch (Exception ex) { Log.Warning(ex, "Could not open the game's melding window"); }
     }
 
     private void UpdateWantedNotifications(IReadOnlyCollection<OwnedItem>? live)
@@ -349,6 +373,7 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         RetainerScan.Stop();
+        MeldingGuide.Stop();
         Inventory.InventoryChanged -= OnInventoryChanged;
         AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
         AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);

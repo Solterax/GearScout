@@ -13,6 +13,8 @@
     <Compile Include="../GearSearch.cs" Link="GearSearch.cs" />
     <Compile Include="../RetainerScanSession.cs" Link="RetainerScanSession.cs" />
     <Compile Include="../WantedItemTracker.cs" Link="WantedItemTracker.cs" />
+    <Compile Include="../MeldPlanner.cs" Link="MeldPlanner.cs" />
+    <Compile Include="../MeldGuide.cs" Link="MeldGuide.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

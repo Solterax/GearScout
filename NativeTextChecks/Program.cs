@@ -36,3 +36,24 @@ var localized = new SeString(new TextPayload("Objekte verwalten. (Belegt: "), nu
 Match(localized, ["Gil verwalten.", "Objekte verwalten. (Belegt: 42)"], 1);
 Match(new SeString(numericMacro).Encode(), menu, -1);
 Console.WriteLine("8 retainer menu checks passed: screenshot label, changing counter, Quit, unrelated entries, ambiguity, exact static text, localization and empty prefix.");
+
+if (args.Length == 2 && args[0] == "--game-data")
+{
+    using var game = new Lumina.GameData(args[1]);
+    var meldData = new MeldData(null, game);
+    meldData.Load();
+    if (meldData.Error != null || meldData.Materia.Count == 0) throw new Exception("Materia game-data adapter failed");
+    var xi = meldData.Materia.Values.First(m => m.Name == "Savage Aim Materia XI");
+    var xii = meldData.Materia.Values.First(m => m.Name == "Savage Aim Materia XII");
+    var accessory = meldData.Rules(49306, true)!;
+    var bodyRow = game.GetExcelSheet<Lumina.Excel.Sheets.Item>()!.First(i => i.IsAdvancedMeldingPermitted && i.MateriaSlotCount == 2 && i.LevelItem.RowId >= 690 && i.EquipSlotCategory.RowId == 4);
+    var body = meldData.Rules(bodyRow.RowId, true)!;
+    if (accessory.GuaranteedSlots != 1 || !accessory.Advanced || MeldPlanner.Rate(accessory, xi, true, 4) != 0.05 ||
+        MeldPlanner.Rate(body, xi, true, 4) != 0.07) throw new Exception("Actual accessory/armor slot rates are incorrect");
+    if (MeldPlanner.Rate(accessory, xii, true, 2) != 0 || xii.RetrievalRate != 0.4 || xi.RetrievalRate != 0.8)
+        throw new Exception("Current grade restriction/retrieval data is incorrect");
+    if (accessory.StatCaps.GetValueOrDefault(xi.Parameter) <= 0 || accessory.StatCaps.GetValueOrDefault(xi.Parameter) < accessory.BaseStats.GetValueOrDefault(xi.Parameter))
+        throw new Exception("Actual item stat-cap calculation failed");
+    if (meldData.Rules(49638, false)!.Advanced) throw new Exception("Guaranteed-only accessory incorrectly permits overmelding");
+    Console.WriteLine("5 installed-game melding checks passed: materia lookup, accessory/armor rates, grade/retrieval rules, stat caps and advanced-melding permission.");
+}

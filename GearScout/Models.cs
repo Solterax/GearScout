@@ -19,7 +19,14 @@ public sealed class GearPiece
 }
 
 public sealed record OwnedItem(uint ItemId, int Quantity, string Location, bool Equipped,
-    IReadOnlyList<uint>? Materia = null, DateTimeOffset? LastCheckedUtc = null);
+    IReadOnlyList<uint>? Materia = null, DateTimeOffset? LastCheckedUtc = null)
+{
+    public int Container { get; init; } = -1;
+    public int InventorySlot { get; init; } = -1;
+    public bool? HighQuality { get; init; }
+    public string CopyKey => $"{Container}:{InventorySlot}";
+    public bool IsLive => LastCheckedUtc == null && Container >= 0 && InventorySlot >= 0;
+}
 public sealed record PieceStatus(GearPiece Piece, OwnedItem? Match)
 {
     public MateriaComparison? Melds => Piece.Materia != null && Match?.Materia != null

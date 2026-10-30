@@ -10,6 +10,9 @@
   <ItemGroup>
     <Compile Include="../GearScout/LootNameFormatting.cs" Link="LootNameFormatting.cs" />
     <Compile Include="../GearScout/RetainerMenuMatching.cs" Link="RetainerMenuMatching.cs" />
+    <Compile Include="../GearScout/MeldData.cs" Link="MeldData.cs" />
+    <Compile Include="../GearScout/MeldPlanner.cs" Link="MeldPlanner.cs" />
+    <Compile Include="../GearScout/Models.cs" Link="Models.cs" />
     <Reference Include="Dalamud"><HintPath>$(DalamudPath)/Dalamud.dll</HintPath></Reference>
     <Reference Include="Lumina"><HintPath>$(DalamudPath)/Lumina.dll</HintPath></Reference>
     <Reference Include="Lumina.Excel"><HintPath>$(DalamudPath)/Lumina.Excel.dll</HintPath></Reference>

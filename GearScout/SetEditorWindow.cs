@@ -19,6 +19,8 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
     private bool importedCopy;
     private List<GearCandidate> results = [];
     private string? lastSearch;
+    private readonly MateriaTargetEditor materiaTargets = new(plugin);
+    private GearPiece? openMateria;
 
     public void Create(string job)
     {
@@ -66,11 +68,12 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
         if (!string.IsNullOrEmpty(error)) ImGui.TextWrapped(error);
         ImGui.Separator();
 
-        if (ImGui.BeginTable("editorSlots", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY,
+        if (ImGui.BeginTable("editorSlots", draft.IsGlam ? 3 : 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY,
                 new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y))))
         {
             ImGui.TableSetupColumn("Slot", ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableSetupColumn(draft.IsGlam ? "Gear pieces" : "Gear piece — click to search", ImGuiTableColumnFlags.WidthStretch);
+            if (!draft.IsGlam) ImGui.TableSetupColumn("Materia", ImGuiTableColumnFlags.WidthFixed, 100);
             ImGui.TableSetupColumn("##clear", ImGuiTableColumnFlags.WidthFixed, 75);
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
@@ -101,6 +104,8 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
                 if (ImGui.Selectable($"{(piece == null ? "Select gear..." : plugin.ItemName(piece.ItemId))}##{key}"))
                     SearchSlot(key);
                 ImGui.TableNextColumn();
+                if (piece != null && ImGui.SmallButton($"Targets ({piece.Materia?.Count.ToString() ?? "?"})##{key}")) openMateria = piece;
+                ImGui.TableNextColumn();
                 if (piece != null && ImGui.SmallButton($"Clear##{key}")) draft.Pieces.RemoveAll(p => p.Slot == key);
             }
             ImGui.EndTable();
@@ -110,6 +115,8 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
             ImGui.OpenPopup("Find gear"); openPicker = false; focusSearch = true;
         }
         DrawPicker();
+        if (openMateria != null) { materiaTargets.Open(openMateria); openMateria = null; }
+        materiaTargets.Draw();
     }
 
     private void SearchSlot(string key)

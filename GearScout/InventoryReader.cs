@@ -59,7 +59,10 @@ internal static class InventoryReader
                         }
                         melds.Add(row.Item[grades[index]].RowId);
                     }
-                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped, known ? melds : null));
+                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped, known ? melds : null)
+                    {
+                        Container = (int)type, InventorySlot = checked((int)item.InventorySlot), HighQuality = item.IsHq,
+                    });
                 }
             }
         }
