@@ -36,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
     private readonly WantedItemTracker wantedItems = new();
+    private readonly ZoneEquipSession zoneEquip = new();
     private readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<uint, string> itemNames = [];
@@ -74,6 +75,8 @@ public sealed class Plugin : IDalamudPlugin
     internal ulong CharacterId => characterId;
     internal string StorageStatus { get; private set; } = "Open each storage location in game to save its contents.";
     internal GearCatalog Catalog { get; }
+    internal ZoneCatalog Zones { get; }
+    internal string ZoneEquipStatus => zoneEquip.Status;
     internal MeldData MeldingData { get; }
     internal MeldGuide MeldingGuide { get; } = new();
     internal AutomaticMeldController AutoMelding { get; }
@@ -86,6 +89,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Config = PluginInterface.GetPluginConfig() as Configuration ?? new();
         Config.StorageSnapshots ??= [];
+        foreach (var set in Config.Sets) set.AutoEquipTerritories ??= [];
         // Loot always checks all saved jobs. Resaving also drops the obsolete job-scope setting.
         if (Config.Version < 3)
         {
@@ -94,6 +98,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         window = new MainWindow(this);
         Catalog = new GearCatalog(Data);
+        Zones = new ZoneCatalog(Data);
         MeldingData = new MeldData(Data);
         AutoMelding = new AutomaticMeldController(this);
         Equipper = new EquipSetController(this);
@@ -111,6 +116,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenMainUi += Open;
         PluginInterface.UiBuilder.OpenConfigUi += Open;
         Framework.Update += Update;
+        Client.TerritoryChanged += OnTerritoryChanged;
+        Client.Logout += OnLogout;
         Inventory.InventoryChanged += OnInventoryChanged;
         AddonLifecycle.RegisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
         AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);
@@ -124,10 +131,65 @@ public sealed class Plugin : IDalamudPlugin
     internal void OpenMelding(TrackedSet set) => meldingWindow.Open(set);
     internal void EquipSet(TrackedSet set)
     {
+        zoneEquip.Cancel();
         try { Equipper.Start(set); nextScan = 0; Message = ""; MessageIsError = false; }
         catch (Exception ex) { ReportError(ex.Message); }
     }
     internal void RequestMeldingWindow() { openMeldRequested = true; MeldingWindowStatus = "Opening the game's melding window..."; }
+
+    private void OnLogout(int type, int code) => zoneEquip.Cancel();
+    private void OnTerritoryChanged(uint territory)
+    {
+        zoneEquip.Cancel();
+        if (!Config.AutoEquipOnEntry || !Config.Sets.Any(s => !s.IsGlam && s.AutoEquipTerritories.Contains(territory))) return;
+        zoneEquip.Enter(territory, Player.IsLoaded ? Player.ContentId : 0, Environment.TickCount64);
+        Owned = null;
+        nextScan = 0;
+    }
+
+    internal void AssignZone(TrackedSet target, uint territory)
+    {
+        var previous = Config.Sets.Select(s => (Set: s, Zones: s.AutoEquipTerritories.ToList())).ToList();
+        try { ZoneEquipRules.Assign(Config.Sets, target, territory); Save(); }
+        catch (Exception ex)
+        {
+            foreach (var entry in previous) entry.Set.AutoEquipTerritories = entry.Zones;
+            ReportError("Could not save zone assignment: " + ex.Message);
+        }
+    }
+    internal void RemoveZone(TrackedSet target, uint territory)
+    {
+        var previous = target.AutoEquipTerritories.ToList();
+        target.AutoEquipTerritories.RemoveAll(id => id == territory);
+        try { Save(); }
+        catch (Exception ex) { target.AutoEquipTerritories = previous; ReportError("Could not save zone assignment: " + ex.Message); }
+    }
+
+    private void UpdateZoneEquip(bool ready)
+    {
+        if (!Config.AutoEquipOnEntry) { zoneEquip.Cancel(); return; }
+        if (!zoneEquip.Pending) return;
+        var set = zoneEquip.Tick(Client.TerritoryType, characterId, CurrentJob, ready && Owned != null,
+            !Equipper.CanStart, Config.Sets, Environment.TickCount64);
+        if (set != null)
+        {
+            try
+            {
+                Equipper.Start(set);
+                nextScan = 0;
+                Config.SelectedByJob[CurrentJob] = set.Id;
+                Chat.Print($"Auto-equipping {set.Name} ({CurrentJob}) for {Zones.Name(Client.TerritoryType)}.", "GearScout");
+            }
+            catch (Exception ex)
+            {
+                ReportError("Auto-equip could not start: " + ex.Message);
+                Chat.Print("Auto-equip could not start: " + ex.Message, "GearScout");
+                Log.Warning(ex, "Zone auto-equip failed");
+            }
+        }
+        else if (!zoneEquip.Pending && !string.IsNullOrWhiteSpace(zoneEquip.Status))
+            Chat.Print(zoneEquip.Status, "GearScout");
+    }
 
     internal void SaveLocalSet(TrackedSet set)
     {
@@ -209,6 +271,7 @@ public sealed class Plugin : IDalamudPlugin
     private void Update(IFramework framework)
     {
         Catalog.Update();
+        Zones.Update();
         // All configuration and game access stays on the framework thread.
         if (pendingImport is { IsCompleted: true })
         {
@@ -224,6 +287,7 @@ public sealed class Plugin : IDalamudPlugin
                     var old = previous.FirstOrDefault(s => s.Job == set.Job && s.Name == set.Name);
                     if (old == null) continue;
                     set.Id = old.Id;
+                    set.AutoEquipTerritories = old.AutoEquipTerritories.ToList();
                     previous.Remove(old);
                 }
                 var oldSets = Config.Sets;
@@ -276,8 +340,9 @@ public sealed class Plugin : IDalamudPlugin
             else if (Environment.TickCount64 >= meldingOpenDeadline) { meldingOpenDeadline = 0; MeldingWindowStatus = "The game did not open melding. Check Actions & Traits → General for Materia Melding; finish any active action or dialog, then try again."; }
         }
         RetainerScan.Update(ready);
+        UpdateZoneEquip(ready);
         // Loot highlighting and chat notifications need fresh ownership with the checklist closed.
-        if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Equipper.Running && !Config.HighlightLoot && !Config.NotifyWantedItems)
+        if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Equipper.Running && !zoneEquip.Pending && !Config.HighlightLoot && !Config.NotifyWantedItems)
         {
             Owned = null;
             wantedItems.Suspend();
@@ -438,6 +503,8 @@ public sealed class Plugin : IDalamudPlugin
             catch (Exception ex) { Log.Warning(ex, "Could not save pending storage checks during unload"); }
         }
         Framework.Update -= Update;
+        Client.TerritoryChanged -= OnTerritoryChanged;
+        Client.Logout -= OnLogout;
         PluginInterface.UiBuilder.Draw -= windows.Draw;
         PluginInterface.UiBuilder.Draw -= lootHighlighter.Draw;
         lootHighlighter.Dispose();
@@ -446,6 +513,7 @@ public sealed class Plugin : IDalamudPlugin
         Commands.RemoveHandler("/gearscout");
         windows.RemoveAllWindows();
         Catalog.Dispose();
+        Zones.Dispose();
         lifetime.Cancel();
         // Observe a cancelled/faulted in-flight request without blocking the game thread.
         if (pendingImport != null)

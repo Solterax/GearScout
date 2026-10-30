@@ -43,6 +43,14 @@ The main checklist groups all selected pieces by slot, with a separate ownership
 
 Glam sets track appearances, hide the materia column, and include saved dresser/armoire/retainer ownership. One owned appearance can satisfy repeated slots, so the same unique ring appearance can be used on both hands. Missing glam pieces participate in the same all-job loot indicators. Regular sets retain job filtering and separate-copy requirements. This plans an outfit; it does not apply a glamour plate or change the game's equip rules.
 
+## Automatically equip a set on duty or zone entry
+
+Select a normal set, expand **Auto-equip on entry**, then choose **Add duty / zone...**. Search for a duty such as **Futures Rewritten (Ultimate)** and select it. **Assign current zone** also lets you bind the zone you are standing in. Assignments save automatically and can be removed individually. The master checkbox pauses automatic equipping for every set.
+
+On your next entry, GearScout chooses the assigned set for your current job, waits for loading/cutscenes to finish and two stable seconds out of combat, then uses the existing equip workflow. It equips available items from bags and Armoury Chest, verifies swaps, and reports missing or stored pieces in chat. It runs with the GearScout window closed. There is no job change, automatic storage withdrawal or gear restoration on exit. Assignment edits take effect on the next entry; changing job or wiping within a duty does not trigger another equip pass.
+
+Each set can cover several zones. Assigning the same zone to another set for that job replaces the old assignment; other jobs keep their own sets for that duty. Glam collections cannot be assigned. Entry requests expire after three minutes if loading, combat or another action keeps equipment changes blocked.
+
 ## Features and scope
 
 - Import individual sets or multi-set sheets and choose between saved sets.

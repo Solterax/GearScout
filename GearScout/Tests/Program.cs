@@ -876,6 +876,8 @@ foreach (var changedCopy in new[] { originalCopy with { Materia = new uint[] { 2
 Check(!StorageCache.SameOwnership([originalCopy], null) && !StorageCache.SameOwnership(null, [originalCopy]) &&
     !StorageCache.SameOwnership([originalCopy], []), "Unreadable or removed ownership invalidates cached plans");
 
+ZoneEquipChecks.Run(Check, Reject);
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

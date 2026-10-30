@@ -7,6 +7,7 @@ public sealed class TrackedSet
     public string Job { get; set; } = "";
     public bool IsGlam { get; set; }
     public string SourceUrl { get; set; } = "";
+    public List<uint> AutoEquipTerritories { get; set; } = [];
     public List<GearPiece> Pieces { get; set; } = [];
 }
 

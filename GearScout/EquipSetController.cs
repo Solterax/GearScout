@@ -8,6 +8,7 @@ internal sealed unsafe class EquipSetController(Plugin plugin)
 {
     public EquipSetSession Session { get; } = new();
     public bool Running => Session.Running;
+    public bool CanStart => !Running && !plugin.AutoMelding.Running && !plugin.RetainerScan.Session.Running && !Blocked();
     private TrackedSet? sourceSet;
     private string fingerprint = "";
     private bool reported;
@@ -93,6 +94,10 @@ internal sealed unsafe class EquipSetController(Plugin plugin)
             Plugin.Chat.Print($"{GearSearch.SlotName(result.Piece.Slot)} — {plugin.ItemName(result.Piece.ItemId)}: {result.Details}", "GearScout");
     }
     private static bool Blocked() => Plugin.Condition[ConditionFlag.InCombat] || Plugin.Condition[ConditionFlag.Occupied39] ||
+        Plugin.Condition[ConditionFlag.Occupied] || Plugin.Condition[ConditionFlag.OccupiedInEvent] ||
+        Plugin.Condition[ConditionFlag.OccupiedInQuestEvent] || Plugin.Condition[ConditionFlag.OccupiedInCutSceneEvent] ||
+        Plugin.Condition[ConditionFlag.WatchingCutscene] || Plugin.Condition[ConditionFlag.WatchingCutscene78] ||
+        Plugin.Condition[ConditionFlag.Casting] || Plugin.Condition[ConditionFlag.OccupiedSummoningBell] ||
         Plugin.Condition[ConditionFlag.MeldingMateria] || Plugin.GameGui.GetAddonByName("SelectYesno").IsVisible ||
         Plugin.GameGui.GetAddonByName("ContextMenu").IsVisible;
     private static string Fingerprint(TrackedSet set) => set.Job + "|" + string.Join(';', set.Pieces.Select(p =>

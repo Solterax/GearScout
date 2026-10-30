@@ -47,6 +47,7 @@ public static class GearSearch
         {
             Slot = p.Slot, ItemId = p.ItemId, Materia = p.Materia?.ToList(),
         }).ToList(),
+        AutoEquipTerritories = string.IsNullOrWhiteSpace(source.SourceUrl) ? source.AutoEquipTerritories.ToList() : [],
     };
 
     public static void SetPiece(TrackedSet set, string slot, GearCandidate item)

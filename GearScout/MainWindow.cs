@@ -7,6 +7,7 @@ namespace GearScout;
 internal sealed class MainWindow : Window
 {
     private readonly Plugin plugin;
+    private readonly ZoneAssignmentUi zoneAssignments;
     private string link = "";
     private bool missingOnly;
     private static readonly Vector4 Green = new(0.42f, 0.88f, 0.62f, 1);
@@ -16,6 +17,7 @@ internal sealed class MainWindow : Window
     public MainWindow(Plugin plugin) : base($"GearScout v{typeof(Plugin).Assembly.GetName().Version?.ToString(3) ?? "unknown"} — Gear sets###GearScoutMain")
     {
         this.plugin = plugin;
+        zoneAssignments = new ZoneAssignmentUi(plugin);
         Size = new Vector2(1000, 650);
         SizeCondition = ImGuiCond.FirstUseEver;
         SizeConstraints = new WindowSizeConstraints
@@ -126,6 +128,7 @@ internal sealed class MainWindow : Window
 
         if (!selected.IsGlam)
         {
+            zoneAssignments.Draw(selected);
             if (ImGui.Button("Melding planner")) plugin.OpenMelding(selected);
             ImGui.SameLine();
             if (plugin.Equipper.Running)
