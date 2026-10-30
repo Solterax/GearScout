@@ -108,7 +108,7 @@ public static class MeldPlanner
 }
 
 public sealed record MateriaBudget(uint MateriaId, int Minimum, double Average, int Budget,
-    int Bags, int Retainers, double AvailableChance)
+    int Bags, int Retainers, double AvailableChance, int Saddlebags = 0)
 {
     public int Additional => Math.Max(0, Budget - Bags);
 }
@@ -154,9 +154,10 @@ public static class MeldProbability
             var distribution = Distribution(probabilities);
             var bags = owned.Where(i => i.ItemId == group.Key && i.IsLive && i.Container is >= 0 and <= 3).Sum(i => i.Quantity);
             var retainers = owned.Where(i => i.ItemId == group.Key && i.LastCheckedUtc != null && i.Location.StartsWith("Retainer:", StringComparison.Ordinal)).Sum(i => i.Quantity);
+            var saddlebags = owned.Where(i => i.ItemId == group.Key && i.LastCheckedUtc != null && i.StorageKey is "saddlebag" or "saddlebag:premium").Sum(i => i.Quantity);
             var chance = distribution.Take(Math.Min(distribution.Length, bags + 1)).Sum();
             completion *= chance;
-            items.Add(new(group.Key, probabilities.Length, probabilities.Sum(p => 1 / p), Quantile(distribution, perType), bags, retainers, chance));
+            items.Add(new(group.Key, probabilities.Length, probabilities.Sum(p => 1 / p), Quantile(distribution, perType), bags, retainers, chance, saddlebags));
         }
         return new(items, completion, plans.All(p => p.Valid));
     }

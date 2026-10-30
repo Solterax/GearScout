@@ -49,7 +49,7 @@ public sealed class Plugin : IDalamudPlugin
     private long storageRefreshUntil;
     private bool storageRefreshPending;
     private long storageTransferUntil;
-    private static readonly string[] StorageAddons = ["InventoryRetainer", "InventoryRetainerLarge", "RetainerCharacter", "MiragePrismPrismBox", "Cabinet", "CabinetWithdraw"];
+    private static readonly string[] StorageAddons = ["InventoryRetainer", "InventoryRetainerLarge", "RetainerCharacter", "MiragePrismPrismBox", "Cabinet", "CabinetWithdraw", "InventoryBuddy"];
 
     internal Configuration Config { get; }
     internal string CurrentJob { get; private set; } = "";
@@ -356,7 +356,7 @@ public sealed class Plugin : IDalamudPlugin
                 if (snapshots.Count > 0 && !storageSavePending)
                     StorageStatus = "Checked: " + string.Join(", ", snapshots.Select(s => s.Name));
                 else if (storageScanRequested)
-                    StorageStatus = "Open a retainer inventory, glamour dresser or armoire and wait for loading. Checks save automatically once ready.";
+                    StorageStatus = "Open a retainer inventory, saddlebag, glamour dresser or armoire and wait for loading. Checks save automatically once ready.";
                 storageScanRequested = false;
                 if (snapshots.Count > 0 || Environment.TickCount64 > storageRefreshUntil) storageRefreshPending = false;
                 if (changed)

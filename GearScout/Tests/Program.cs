@@ -704,6 +704,40 @@ Check(!automatic.Running && autoGuide.Completed == fullPlan.Actions.Count && aut
 
 Check(!automatic.Running, "The final verified result leaves no queued automation commands");
 
+var saddleChecks = new List<StorageSnapshot>
+{
+    Snapshot(100, "saddlebag", new StoredItem { ItemId = 100, Quantity = 1, HighQuality = true, Materia = [1] }),
+    Snapshot(100, "saddlebag:premium", new StoredItem { ItemId = 101, Quantity = 1, HighQuality = false, Materia = [2] }),
+    Snapshot(200, "saddlebag", new StoredItem { ItemId = 999, Quantity = 1 }),
+};
+var saddleOwned = StorageCache.Merge([], saddleChecks, 100)!;
+Check(saddleOwned.Count == 2 && saddleOwned.All(i => i.LastCheckedUtc != null && !i.IsLive) &&
+    saddleOwned.Select(i => i.StorageKey).ToHashSet().SetEquals(new[] { "saddlebag", "saddlebag:premium" }),
+    "Standard and premium saddlebag ownership remains separate, saved and character-isolated");
+Check(saddleOwned.Single(i => i.ItemId == 100).HighQuality == true && saddleOwned.Single(i => i.ItemId == 100).Materia!.Single() == 1,
+    "Saddlebag ownership preserves gear quality and attached materia");
+Check(LootMatcher.MissingItems(noticeSets, saddleOwned).Count == 0,
+    "Wanted gear in either saddlebag suppresses missing-item loot indicators");
+var saddleReload = System.Text.Json.JsonSerializer.Deserialize<List<StorageSnapshot>>(System.Text.Json.JsonSerializer.Serialize(saddleChecks))!;
+Check(StorageCache.Merge([], saddleReload, 100)!.Count == 2 && StorageCache.Merge([], saddleReload, 200)!.Single().ItemId == 999,
+    "Both saddlebag snapshots survive local reload without crossing characters");
+StorageCache.Replace(saddleChecks, Snapshot(100, "saddlebag"));
+var withdrawnSaddle = StorageCache.Merge(hat100, saddleChecks, 100)!;
+Check(withdrawnSaddle.Where(i => i.ItemId == 100).Sum(i => i.Quantity) == 1 && withdrawnSaddle.Any(i => i.ItemId == 101),
+    "Withdrawals replace the saddlebag snapshot without duplicating the live copy or erasing premium contents");
+Check(LootMatcher.MissingItems(noticeSets, StorageCache.Merge([], saddleChecks, 100)).Contains(100),
+    "An emptied saddlebag no longer contributes stale gear ownership");
+StorageCache.Replace(saddleChecks, Snapshot(100, "saddlebag", new StoredItem { ItemId = 1, Quantity = 42 }));
+StorageCache.Replace(saddleChecks, Snapshot(100, "saddlebag:premium", new StoredItem { ItemId = 1, Quantity = 8 }));
+var saddleMateria = StorageCache.Merge([], saddleChecks, 100)!;
+var saddleBudget = MeldProbability.Budget([guidePlan], saddleMateria, 0.95).Items.Single();
+Check(saddleBudget.Saddlebags == 50 && saddleBudget.Bags == 0 && saddleBudget.Retainers == 0 && saddleBudget.AvailableChance == 0 && saddleBudget.Additional == 1,
+    "Saddlebag materia is shown as remote stock without making it usable for automatic melding");
+var saddleNotice = new WantedItemTracker();
+saddleNotice.ObserveOwnership(100, noticeSets, [], saddleOwned);
+Check(saddleNotice.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0,
+    "Withdrawing previously checked saddlebag gear does not trigger a new-acquisition message");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

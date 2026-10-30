@@ -3,6 +3,7 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using Lumina.Excel.Sheets;
 using CabinetRow = Lumina.Excel.Sheets.Cabinet;
 
@@ -38,6 +39,7 @@ internal sealed unsafe class StorageScanner
         ReadRetainer();
         ReadDresser();
         ReadArmoire();
+        ReadSaddlebags();
         foreach (var key in firstSeen.Keys.Where(k => !active.Contains(k)).ToArray()) firstSeen.Remove(key);
         openLastRead.Clear();
         openLastRead.UnionWith(opened);
@@ -136,6 +138,23 @@ internal sealed unsafe class StorageScanner
                     items.Add(new() { ItemId = row.Item.RowId, Quantity = 1, Materia = [] });
             }
             Add("armoire", "Armoire", items);
+        }
+
+        void ReadSaddlebags()
+        {
+            var addon = gui.GetAddonByName<AddonInventoryBuddy>("InventoryBuddy");
+            var visible = addon != null && addon->IsVisible && addon->IsReady;
+            // Only the selected tab proves that this source is accessible and was opened for
+            // the current character. Premium containers can be absent or retain unloaded data.
+            ReadTab("saddlebag", "Chocobo saddlebag", 0, [InventoryType.SaddleBag1, InventoryType.SaddleBag2]);
+            ReadTab("saddlebag:premium", "Premium chocobo saddlebag", 1, [InventoryType.PremiumSaddleBag1, InventoryType.PremiumSaddleBag2]);
+
+            void ReadTab(string key, string name, byte tab, InventoryType[] containers)
+            {
+                if (!Available(key, visible && addon->TabIndex == tab) || !Stable(key)) return;
+                var items = ReadContainers(containers, inventory, data);
+                if (items != null) Add(key, name, items);
+            }
         }
 
         bool Open(string name) => gui.GetAddonByName(name).IsVisible;

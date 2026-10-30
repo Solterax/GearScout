@@ -24,6 +24,7 @@ public sealed record OwnedItem(uint ItemId, int Quantity, string Location, bool 
     public int Container { get; init; } = -1;
     public int InventorySlot { get; init; } = -1;
     public bool? HighQuality { get; init; }
+    public string? StorageKey { get; init; }
     public string CopyKey => $"{Container}:{InventorySlot}";
     public bool IsLive => LastCheckedUtc == null && Container >= 0 && InventorySlot >= 0;
 }

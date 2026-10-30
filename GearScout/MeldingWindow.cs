@@ -91,7 +91,7 @@ internal sealed class MeldingWindow : Window
         if (budget != null)
         {
             ImGui.TextUnformatted($"Chance with bag stock, before refunds: {budget.CompletionChance:P1} {(budget.CompletePlan ? "for this plan" : "for valid pieces only — incomplete plan")}");
-            ImGui.TextWrapped("Budgets combine all planned melds and exclude potential retrieval refunds. Separate material-type budgets jointly meet the selected confidence. Saved retainer stock must be withdrawn first.");
+            ImGui.TextWrapped("Budgets combine all planned melds and exclude potential retrieval refunds. Separate material-type budgets jointly meet the selected confidence. Saddlebag and retainer stock must be moved into bags first.");
         }
         if (ImGui.BeginChild("meldContents", new Vector2(0, 405), true))
         {
@@ -145,14 +145,14 @@ internal sealed class MeldingWindow : Window
                 ImGui.EndTable();
             }
             ImGui.Separator();
-            if (budget != null && ImGui.BeginTable("materiaBudget", 7, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+            if (budget != null && ImGui.BeginTable("materiaBudget", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
             {
-                foreach (var title in new[] { "Materia", "Bags", "Retainers", "Minimum", "Average", "Budget", "Get more" }) ImGui.TableSetupColumn(title);
+                foreach (var title in new[] { "Materia", "Bags", "Saddlebags", "Retainers", "Minimum", "Average", "Budget", "Get more" }) ImGui.TableSetupColumn(title);
                 ImGui.TableHeadersRow();
                 foreach (var row in budget.Items)
                 {
                     ImGui.TableNextRow();
-                    foreach (var text in new[] { plugin.ItemName(row.MateriaId), row.Bags.ToString(), row.Retainers.ToString(), row.Minimum.ToString(), row.Average.ToString("F1"), row.Budget.ToString(), row.Additional.ToString() })
+                    foreach (var text in new[] { plugin.ItemName(row.MateriaId), row.Bags.ToString(), row.Saddlebags.ToString(), row.Retainers.ToString(), row.Minimum.ToString(), row.Average.ToString("F1"), row.Budget.ToString(), row.Additional.ToString() })
                     { ImGui.TableNextColumn(); ImGui.TextWrapped(text); }
                 }
                 ImGui.EndTable();

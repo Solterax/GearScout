@@ -36,7 +36,7 @@ internal sealed class MainWindow : Window
             SaveSafely();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Highlights wanted, missing items for ALL saved jobs, including gear you can only Greed.\nIncludes saved retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
+            ImGui.SetTooltip("Highlights wanted, missing items for ALL saved jobs, including gear you can only Greed.\nIncludes saved saddlebag, retainer, dresser and armoire checks for this character.\nCoffers and exchange tokens are not mapped.");
         ImGui.TextColored(Muted, "Loot checks: all saved jobs");
         var notifyWanted = plugin.Config.NotifyWantedItems;
         if (ImGui.Checkbox("Chat messages for wanted drops and new items", ref notifyWanted))
@@ -145,7 +145,7 @@ internal sealed class MainWindow : Window
         ImGui.TextColored(Muted, selected.IsGlam ? "Glam set: all jobs; one owned appearance can be reused across slots." : "Materia type and grade checked; slot order ignored. HQ quality and relic stats are not checked.");
         if (!local && selected.Pieces.Any(p => p.Materia == null))
             ImGui.TextColored(Amber, "Materia targets unavailable for some pieces. Click Refresh from link to update an older import.");
-        ImGui.TextColored(Muted, "Retainers, dresser and armoire use last checked contents. Reopen them after changes.");
+        ImGui.TextColored(Muted, "Saddlebags, retainers, dresser and armoire use last checked contents. Reopen them after changes.");
 
         if (!ImGui.BeginTable("gear", selected.IsGlam ? 4 : 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH |
                 ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY, new Vector2(0, Math.Max(100, ImGui.GetContentRegionAvail().Y)))) return;
@@ -186,7 +186,7 @@ internal sealed class MainWindow : Window
     private void DrawStorage()
     {
         if (!ImGui.CollapsingHeader("Saved storage checks")) return;
-        ImGui.TextWrapped("Storage saves automatically on opening and after item transfers. To check every retainer, open a summoning bell to its retainer list and start a scan.");
+        ImGui.TextWrapped("Storage saves automatically on opening and after item transfers. Open each saddlebag tab to check its contents. To check every retainer, open a summoning bell to its retainer list and start a scan.");
         if (plugin.RetainerScan.Session.Running)
         {
             if (ImGui.Button("Stop retainer scan")) plugin.RetainerScan.Stop();

@@ -45,7 +45,7 @@ public static class StorageCache
         if (live == null || characterId == 0) return null;
         return live.Concat(snapshots.Where(s => s.CharacterId == characterId)
             .SelectMany(s => s.Items.Select(i => new OwnedItem(i.ItemId, i.Quantity,
-                s.Name + " (saved)", false, i.Materia, s.CheckedAtUtc) { HighQuality = i.HighQuality }))).ToList();
+                s.Name + " (saved)", false, i.Materia, s.CheckedAtUtc) { HighQuality = i.HighQuality, StorageKey = s.Key }))).ToList();
     }
 
     private static string Fingerprint(IEnumerable<StoredItem> items) => string.Join(";", items.Select(i =>
