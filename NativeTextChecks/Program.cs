@@ -55,5 +55,12 @@ if (args.Length == 2 && args[0] == "--game-data")
     if (accessory.StatCaps.GetValueOrDefault(xi.Parameter) <= 0 || accessory.StatCaps.GetValueOrDefault(xi.Parameter) < accessory.BaseStats.GetValueOrDefault(xi.Parameter))
         throw new Exception("Actual item stat-cap calculation failed");
     if (meldData.Rules(49638, false)!.Advanced) throw new Exception("Guaranteed-only accessory incorrectly permits overmelding");
-    Console.WriteLine("5 installed-game melding checks passed: materia lookup, accessory/armor rates, grade/retrieval rules, stat caps and advanced-melding permission.");
+    var relicRules = meldData.Rules(51004, false)!;
+    var relicPlan = MeldPlanner.Build(new GearPiece { ItemId = 51004 }, new OwnedItem(51004, 1, "Equipped", true) { HighQuality = false }, relicRules, meldData.Materia);
+    if (relicRules.GuaranteedSlots != 0 || relicPlan.SkipReason == null || !relicPlan.Valid || relicPlan.Actions.Count != 0)
+        throw new Exception("Actual socketless relic was not excluded before materia validation");
+    var generalActions = game.GetExcelSheet<Lumina.Excel.Sheets.GeneralAction>()!;
+    if (generalActions.GetRow(12).Name.ToString() != "Materia Melding" || generalActions.GetRow(13).Name.ToString() != "Advanced Materia Melding")
+        throw new Exception("Native melding action IDs are incorrect");
+    Console.WriteLine("7 installed-game melding checks passed: materia lookup, accessory/armor rates, grade/retrieval rules, stat caps, advanced permission, socketless relic exclusion and native action IDs.");
 }

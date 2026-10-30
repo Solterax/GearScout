@@ -1,4 +1,4 @@
-# GearScout 0.11.0
+# GearScout 0.11.1
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -100,12 +100,15 @@ Manual acceptance checks:
 28. Edit targets on a local set and an imported set, including duplicate materia and an explicitly empty target. Verify saving/reloading, imported-copy isolation and that glam sets have no melding controls. Select distinct copies of identical rings and verify location/quality/order remain correct; move a selected copy and ensure it is not silently substituted.
 29. Check an HQ one-socket crafted accessory, two-socket crafted body, NQ item and guaranteed-only accessory. Compare every displayed rate, grade restriction, retrieval percentage and stat cap against native dialogs. Check wrong early materia with correct later materia, preservation of valid prefixes, invalid target/item level, unknown quality and old cache refresh. Confirm removal order is bottom-first and budgets include rebuilding removed correct materia.
 30. Follow a guided retrieval and meld, then a failed overmeld, one action at a time. Confirm progress, stock, refunds and remaining budgets update. Test Stop, missing bag materia, reaching a limit, moving/replacing gear, editing targets elsewhere, zoning and character changes. Verify the plugin never confirms actions or continues native batch attempts. Budget estimates and native interaction appearance require in-game verification.
+31. Include a socketless relic with unreadable meld data in an otherwise usable set. Verify it is labeled excluded, has no target-edit/action controls and does not block ready live pieces. Check Include selection and skipped reasons for incomplete, already-correct and saved-only pieces. Confirm live copies are preferred over saved copies. Open melding with the general-action button and verify success/blocked/timeout feedback; no materia should be spent by opening alone.
 
 ## Implementation and references
 
 `Plugin.cs` handles lifecycle and framework-thread updates. `MainWindow.cs` draws the UI. `InventoryReader.cs` uses Dalamud's inventory service. `XivGearImporter.cs` fetches and parses sets without game access. `Models.cs` contains copy-aware matching. HTTP work is asynchronous; game access and configuration changes run on the framework thread. Importing sends the supplied link to XIVGear's public API; no character or inventory data is sent.
 
 `MeldPlanner.cs` builds legal ordered actions and exact geometric-attempt convolutions. It preserves the longest feasible prefix, enumerates at most five remaining materia, and minimizes expected attempts among legal sequences. Per-type quantile thresholds use the nth root of the requested whole-plan confidence; the product of independent type CDFs gives the available-stock completion chance. Truncated distribution tails are not renormalized, keeping estimates conservative. Retrieval refunds are displayed separately. `MeldData.cs` reads installed Item/Materia/MateriaGrade/BaseParam/ItemLevel sheets, including slot/quality/grade rules and slot/role-modified stat caps. `MeldGuide.cs` observes exact copy locations and expected meld states, measures negative bag-count deltas conservatively and stops at session/type limits or invalid transitions. `MeldingWindow.cs` and `MateriaTargetEditor.cs` provide fixed-size planning and target selection windows.
+
+Socketless gear exits planning before validating potentially non-materia relic fields. `MeldEligibility.cs` provides skip reasons and live-first copy allocation. Guidance receives only selected valid live pieces needing work. The native window opener executes GeneralAction 13 when available, otherwise 12, checks action status/acceptance and verifies MateriaAttach visibility with a three-second timeout. It reports blocked/failed openings instead of silently calling the agent's Show method.
 
 Optional installed-game data regression checks (PowerShell 7, run the build first): `dotnet run --project NativeTextChecks/NativeTextChecks.csproj -- --game-data D:/Games/FF14/game/sqpack`. These read game files only and do not perform native in-game actions.
 

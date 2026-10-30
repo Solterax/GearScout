@@ -16,6 +16,7 @@ public sealed class PieceMeldPlan(GearPiece target, OwnedItem? copy)
     public List<MeldAction> Actions { get; } = [];
     public List<string> Errors { get; } = [];
     public List<string> Warnings { get; } = [];
+    public string? SkipReason { get; set; }
     public bool Valid => Errors.Count == 0;
 }
 
@@ -34,6 +35,14 @@ public static class MeldPlanner
         IReadOnlyDictionary<uint, MateriaOption> materia)
     {
         var plan = new PieceMeldPlan(target, copy);
+        // Relic/custom-stat data can resemble invalid materia. Socketless items cannot be
+        // melded at all, so exclude them before examining targets or current materia.
+        if (rules?.GuaranteedSlots == 0)
+        {
+            plan.SkipReason = "No materia sockets — excluded from melding.";
+            if (target.Materia?.Count > 0) plan.Warnings.Add("Materia targets are ignored because this item has no sockets.");
+            return plan;
+        }
         if (target.Materia == null) plan.Errors.Add("Materia target is not specified. Edit targets first.");
         else if (target.Materia.Count > 5) plan.Errors.Add("A piece can have at most five materia.");
         if (copy == null) plan.Errors.Add("Gear not found in checked ownership.");

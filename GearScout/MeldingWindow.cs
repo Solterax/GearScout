@@ -12,6 +12,7 @@ internal sealed class MeldingWindow : Window
     private GearPiece? editingPiece;
     private Guid selectedId;
     private readonly Dictionary<string, string> selections = [];
+    private readonly Dictionary<string, bool> included = [];
     private List<PieceMeldPlan> plans = [];
     private MeldBudget? budget;
     private IReadOnlyCollection<OwnedItem>? lastOwned;
@@ -31,7 +32,7 @@ internal sealed class MeldingWindow : Window
     public void Open(TrackedSet set)
     {
         if (set.IsGlam) return;
-        if (selectedId != set.Id) { plugin.MeldingGuide.Stop(); selections.Clear(); limitInitialized = false; }
+        if (selectedId != set.Id) { plugin.MeldingGuide.Stop(); selections.Clear(); included.Clear(); limitInitialized = false; }
         selectedId = set.Id; dirty = true; error = ""; IsOpen = true;
     }
 
@@ -47,7 +48,7 @@ internal sealed class MeldingWindow : Window
             plugin.MeldingGuide.Stop("Guidance stopped: target set changed. Review the new plan.");
         dirty = false; lastOwned = plugin.Owned; lastSet = set;
         plugin.MeldingData.Load();
-        var suggested = GearMatcher.Match(set.Pieces, plugin.Owned ?? []);
+        var suggested = MeldEligibility.SuggestCopies(set.Pieces, plugin.Owned ?? []);
         plans = [];
         foreach (var piece in set.Pieces)
         {
@@ -64,10 +65,10 @@ internal sealed class MeldingWindow : Window
                     if (choice.Key != null) selections[piece.Slot] = choice.Key;
                 }
             }
-            var rules = copy?.HighQuality is { } hq ? plugin.MeldingData.Rules(piece.ItemId, hq) : null;
+            var rules = plugin.MeldingData.Rules(piece.ItemId, copy?.HighQuality ?? false);
             plans.Add(MeldPlanner.Build(piece, copy, rules, plugin.MeldingData.Materia));
         }
-        foreach (var group in plans.Where(p => p.Copy?.IsLive == true).GroupBy(p => p.Copy!.CopyKey).Where(g => g.Count() > 1))
+        foreach (var group in plans.Where(p => p.SkipReason == null && p.Copy?.IsLive == true).GroupBy(p => p.Copy!.CopyKey).Where(g => g.Count() > 1))
             foreach (var plan in group) plan.Errors.Add("This physical copy is selected in more than one target slot. Choose a separate copy.");
         budget = MeldProbability.Budget(plans, plugin.Owned ?? [], Confidence[confidenceIndex]);
         if (!limitInitialized) { materialLimit = budget.Items.Sum(i => i.Budget); limitInitialized = true; }
@@ -118,9 +119,10 @@ internal sealed class MeldingWindow : Window
                     ImGui.EndDisabled();
                     if (plan.Copy?.LastCheckedUtc is { } time) ImGui.TextWrapped($"Saved check: {time.ToLocalTime():g}");
                     ImGui.TableNextColumn();
+                    if (plan.SkipReason != null) ImGui.TextWrapped(plan.SkipReason);
                     foreach (var issue in plan.Errors) ImGui.TextColored(new Vector4(1, 0.55f, 0.3f, 1), issue);
                     foreach (var warning in plan.Warnings) ImGui.TextWrapped(warning);
-                    if (plan.Valid)
+                    if (plan.Valid && plan.SkipReason == null)
                     {
                         ImGui.TextUnformatted($"Keep first {plan.Preserved} meld(s). {plan.Actions.Count} action(s).");
                         foreach (var action in plan.Actions)
@@ -128,7 +130,11 @@ internal sealed class MeldingWindow : Window
                     }
                     ImGui.TableNextColumn();
                     ImGui.BeginDisabled(plugin.MeldingGuide.Running);
-                    if (ImGui.SmallButton("Edit targets"))
+                    var include = MeldEligibility.CanGuide(plan) && included.GetValueOrDefault(plan.Target.Slot, true);
+                    ImGui.BeginDisabled(!MeldEligibility.CanGuide(plan));
+                    if (ImGui.Checkbox("Include", ref include)) included[plan.Target.Slot] = include;
+                    ImGui.EndDisabled();
+                    if (plan.SkipReason == null && ImGui.SmallButton("Edit targets"))
                     {
                         editing = GearSearch.Draft(set);
                         editingPiece = editing.Pieces.First(p => p.Slot == plan.Target.Slot);
@@ -182,16 +188,24 @@ internal sealed class MeldingWindow : Window
             ImGui.SetNextItemWidth(100); ImGui.InputInt("Material limit (all types combined)", ref materialLimit);
             if (ImGui.Button("Use confidence budget")) materialLimit = budget?.Items.Sum(i => i.Budget) ?? 0;
             ImGui.SameLine();
-            ImGui.BeginDisabled(plans.Count == 0 || plans.Any(p => !p.Valid || p.Copy?.IsLive != true) || materialLimit < 0);
+            var selected = plans.Where(p => MeldEligibility.CanGuide(p) && included.GetValueOrDefault(p.Target.Slot, true)).ToList();
+            ImGui.BeginDisabled(selected.Count == 0 || materialLimit < 0);
             if (ImGui.Button("Start guidance"))
             {
-                try { guide.Start(plugin.CharacterId, plans, plugin.Owned!, budget!.Items.ToDictionary(i => i.MateriaId, _ => materialLimit), materialLimit, Environment.TickCount64); }
+                try { guide.Start(plugin.CharacterId, selected, plugin.Owned!, budget!.Items.ToDictionary(i => i.MateriaId, _ => materialLimit), materialLimit, Environment.TickCount64); }
                 catch (Exception ex) { error = ex.Message; }
             }
             ImGui.EndDisabled();
+            if (selected.Count == 0) ImGui.TextWrapped("Guidance unavailable: no included live gear needs a valid melding action. See each piece's reason below.");
+            else ImGui.TextUnformatted($"Guidance includes {selected.Count} ready piece(s); other pieces are skipped.");
+            if (materialLimit < 0) ImGui.TextWrapped("Guidance unavailable: material limit cannot be negative.");
+            if (plans.Any(p => !MeldEligibility.CanGuide(p)) && ImGui.CollapsingHeader("Why pieces are skipped"))
+                foreach (var plan in plans.Where(p => !MeldEligibility.CanGuide(p)))
+                    ImGui.TextWrapped($"{GearSearch.SlotName(plan.Target.Slot)}: {MeldEligibility.Reason(plan)}");
         }
         if (ImGui.Button("Open melding window")) plugin.RequestMeldingWindow();
         ImGui.SameLine(); ImGui.TextUnformatted("Retrieve through the gear's in-game context menu.");
+        if (!string.IsNullOrWhiteSpace(plugin.MeldingWindowStatus)) ImGui.TextWrapped(plugin.MeldingWindowStatus);
         ImGui.TextWrapped("Perform each action in the game's dialogs. Guidance stops at a limit or an unexpected change; it cannot prevent manual spending or cancel the game's batch melding. Use single attempts to follow the limits.");
     }
 

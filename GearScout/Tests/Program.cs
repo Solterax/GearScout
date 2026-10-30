@@ -532,6 +532,32 @@ var savedQuality = StorageCache.Merge([], [qualityReload], 100)!.Single();
 Check(savedQuality.HighQuality == true && savedQuality.Materia!.SequenceEqual(new uint[] {2, 1}) && !savedQuality.IsLive,
     "Stored quality and materia order survive persistence without creating a fake live copy");
 
+var socketlessRules = armorRules with { GuaranteedSlots = 0, Advanced = false };
+var relicPlan = MeldPlanner.Build(new GearPiece { Slot = "Weapon", ItemId = 100, Materia = null },
+    MeldCopy([]) with { Materia = null }, socketlessRules, materiaRules);
+Check(relicPlan.Valid && relicPlan.SkipReason != null && relicPlan.Errors.Count == 0 && relicPlan.Actions.Count == 0,
+    "Socketless relics are excluded before unreadable current melds or unspecified targets can block the plan");
+var socketlessTarget = MeldPlanner.Build(MeldTarget(1), null, socketlessRules, materiaRules);
+Check(socketlessTarget.Valid && socketlessTarget.Actions.Count == 0 && socketlessTarget.Warnings.Count == 1,
+    "Materia targets cannot generate any actions on socketless gear, even when the gear is missing");
+Check(!MeldEligibility.CanGuide(relicPlan) && MeldEligibility.Reason(relicPlan).Contains("No materia sockets"),
+    "Excluded relic has an explicit reason and is never eligible for guidance");
+Check(!MeldEligibility.CanGuide(retained) && MeldEligibility.Reason(retained).Contains("Already matches"),
+    "Already-correct gear has no pointless guidance actions");
+Check(MeldEligibility.CanGuide(guidePlan) && !MeldEligibility.CanGuide(MeldPlanner.Build(MeldTarget(1), MeldCopy([]) with { Materia = null }, armorRules, materiaRules)),
+    "Unreadable melds still block socketed gear while valid live work remains eligible");
+var copySuggestions = MeldEligibility.SuggestCopies([MeldTarget(1)],
+    [new(100, 1, "Retainer (saved)", false, [1], DateTimeOffset.UtcNow), MeldCopy([])]);
+Check(copySuggestions.Single().Match!.IsLive, "Live copies are preferred to perfectly melded cached copies for guidance");
+GearPiece[] twoRingTargets = [new() { Slot = "RingLeft", ItemId = 100, Materia = [1] }, new() { Slot = "RingRight", ItemId = 100, Materia = [1] }];
+var ringSuggestions = MeldEligibility.SuggestCopies(twoRingTargets, [MeldCopy([]), MeldCopy([], slot: 2)]);
+Check(ringSuggestions.All(s => s.Match!.IsLive) && ringSuggestions.Select(s => s.Match!.CopyKey).Distinct().Count() == 2,
+    "Live-first guidance suggestions still allocate separate copies to duplicate ring targets");
+guide.Start(100, [relicPlan, guidePlan], [MeldCopy([]), Loose(1, 5)], new Dictionary<uint, int> { [1] = 3 }, 3, 0);
+Check(guide.Running && guide.Total == 1, "A socketless relic cannot block guidance for the set's ready socketed gear");
+Check(MeldProbability.Budget([relicPlan, guidePlan], [Loose(1, 1)], 0.95).CompletePlan,
+    "Excluded socketless gear does not make the remaining materia budget an invalid partial plan");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

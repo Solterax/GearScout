@@ -23,6 +23,7 @@ public sealed class MeldGuide
     public void Start(ulong characterId, IReadOnlyList<PieceMeldPlan> plans, IReadOnlyCollection<OwnedItem> owned,
         IReadOnlyDictionary<uint, int> materialLimits, int totalLimit, long now)
     {
+        plans = plans.Where(p => p.SkipReason == null).ToList();
         if (characterId == 0 || plans.Count == 0 || plans.Any(p => !p.Valid || p.Copy is not { IsLive: true }))
             throw new ArgumentException("Guidance requires complete live gear copies and valid targets.");
         if (plans.Select(p => p.Copy!.CopyKey).Distinct().Count() != plans.Count) throw new ArgumentException("A physical copy cannot fill two target slots.");

@@ -32,6 +32,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly SetEditorWindow setEditor;
     private readonly MeldingWindow meldingWindow;
     private bool openMeldRequested;
+    private long meldingOpenDeadline;
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
     private readonly WantedItemTracker wantedItems = new();
@@ -61,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     internal GearCatalog Catalog { get; }
     internal MeldData MeldingData { get; }
     internal MeldGuide MeldingGuide { get; } = new();
+    internal string MeldingWindowStatus { get; private set; } = "";
     internal RetainerScanController RetainerScan { get; }
     internal bool StorageSavePending => storageSavePending;
 
@@ -102,7 +104,7 @@ public sealed class Plugin : IDalamudPlugin
     internal void CreateGlamSet() => setEditor.CreateGlam();
     internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
     internal void OpenMelding(TrackedSet set) => meldingWindow.Open(set);
-    internal void RequestMeldingWindow() => openMeldRequested = true;
+    internal void RequestMeldingWindow() { openMeldRequested = true; MeldingWindowStatus = "Opening the game's melding window..."; }
 
     internal void SaveLocalSet(TrackedSet set)
     {
@@ -238,7 +240,17 @@ public sealed class Plugin : IDalamudPlugin
         if (ready) UpdateStorage();
         else wantedItems.Suspend();
         if (!ready) MeldingGuide.Observe(characterId, false, null, Environment.TickCount64);
-        if (openMeldRequested) { openMeldRequested = false; if (ready) ShowNativeMelding(); }
+        if (openMeldRequested)
+        {
+            openMeldRequested = false;
+            if (ready) ShowNativeMelding();
+            else MeldingWindowStatus = "Wait until your character has finished loading, then try again.";
+        }
+        if (meldingOpenDeadline != 0)
+        {
+            if (GameGui.GetAddonByName("MateriaAttach").IsVisible) { meldingOpenDeadline = 0; MeldingWindowStatus = "Melding window opened."; }
+            else if (Environment.TickCount64 >= meldingOpenDeadline) { meldingOpenDeadline = 0; MeldingWindowStatus = "The game did not open melding. Check Actions & Traits → General for Materia Melding; finish any active action or dialog, then try again."; }
+        }
         RetainerScan.Update(ready);
         // Loot highlighting and chat notifications need fresh ownership with the checklist closed.
         if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Config.HighlightLoot && !Config.NotifyWantedItems)
@@ -266,15 +278,28 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private static unsafe void ShowNativeMelding()
+    private unsafe void ShowNativeMelding()
     {
         try
         {
-            var module = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule.Instance();
-            var agent = module == null ? null : module->GetAgentByInternalId(FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId.MateriaAttach);
-            if (agent != null) agent->Show();
+            meldingOpenDeadline = 0;
+            if (GameGui.GetAddonByName("MateriaAttach").IsVisible) { MeldingWindowStatus = "Melding window is already open."; return; }
+            var manager = FFXIVClientStructs.FFXIV.Client.Game.ActionManager.Instance();
+            if (manager == null) { MeldingWindowStatus = "Game actions are unavailable. Try again after loading."; return; }
+            var type = FFXIVClientStructs.FFXIV.Client.Game.ActionType.GeneralAction;
+            // Invoke the same general action as the player's hotbar; Agent.Show alone does
+            // not initialize the game's materia-attach workflow.
+            uint action = manager->GetActionStatus(type, 13) == 0 ? 13u : 12u;
+            var status = manager->GetActionStatus(type, action);
+            if (status != 0)
+            {
+                MeldingWindowStatus = $"The game currently blocks Materia Melding (status {status}). Check that it is unlocked through Waking the Spirit and finish any active action or dialog.";
+                return;
+            }
+            if (!manager->UseAction(type, action)) { MeldingWindowStatus = "The game rejected Materia Melding. Finish the current action or dialog and try again."; return; }
+            meldingOpenDeadline = Environment.TickCount64 + 3000;
         }
-        catch (Exception ex) { Log.Warning(ex, "Could not open the game's melding window"); }
+        catch (Exception ex) { MeldingWindowStatus = "Could not open melding. See /xllog for details."; Log.Warning(ex, "Could not open the game's melding window"); }
     }
 
     private void UpdateWantedNotifications(IReadOnlyCollection<OwnedItem>? live)
