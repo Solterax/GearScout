@@ -31,6 +31,8 @@ Use **Edit set** to change or rename a local set, or click an item name directly
 
 The builder and search popup have fixed dimensions; scrolling stays inside their item lists.
 
+To save what you are currently wearing, click **Save current gear as set**, enter the name you want, and click **Save**. GearScout reads your equipped items when you save and creates a new local set for your current class/job, including each piece's current materia. Empty gear slots and the soul crystal are skipped, and both ring slots are preserved separately. The new set is selected automatically. **Cancel** closes the name prompt without creating a set. Wait for equipping or automatic melding to finish before capturing your gear.
+
 Search reads installed game data locally and builds its index in small batches. The first search may briefly show **Loading local gear data...**. It includes both ring slots and prevents selecting the same unique ring twice. This is a gear planner; it does not create/equip an FFXIV character gearset. New or changed local pieces initially have no specified materia target; use **Targets** to choose up to five materia, including repeats. Unchanged imported-copy pieces retain their meld plans. Empty targets explicitly request no melds.
 
 ## Build a job-independent glam set

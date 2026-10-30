@@ -877,6 +877,7 @@ Check(!StorageCache.SameOwnership([originalCopy], null) && !StorageCache.SameOwn
     !StorageCache.SameOwnership([originalCopy], []), "Unreadable or removed ownership invalidates cached plans");
 
 ZoneEquipChecks.Run(Check, Reject);
+CurrentGearChecks.Run(Check, Reject);
 
 if (args.Contains("--live"))
 {

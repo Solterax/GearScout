@@ -31,6 +31,9 @@ internal static class InventoryReader
     public static List<OwnedItem>? Read(IGameInventory inventory, IDataManager data)
         => ReadContainers(Containers, inventory, data);
 
+    public static List<OwnedItem>? ReadEquipped(IGameInventory inventory, IDataManager data)
+        => ReadContainers([(InventoryType.EquippedItems, "Equipped", true)], inventory, data);
+
     internal static List<OwnedItem>? ReadContainers(IEnumerable<(InventoryType Type, string Label, bool Equipped)> containers,
         IGameInventory inventory, IDataManager data)
     {

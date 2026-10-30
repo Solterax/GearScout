@@ -10,6 +10,9 @@ internal sealed class MainWindow : Window
     private readonly ZoneAssignmentUi zoneAssignments;
     private string link = "";
     private bool missingOnly;
+    private string currentGearName = "";
+    private string currentGearError = "";
+    private bool focusGearName;
     private static readonly Vector4 Green = new(0.42f, 0.88f, 0.62f, 1);
     private static readonly Vector4 Amber = new(1, 0.73f, 0.35f, 1);
     private static readonly Vector4 Muted = new(0.65f, 0.7f, 0.76f, 1);
@@ -73,6 +76,7 @@ internal sealed class MainWindow : Window
         if (ImGui.Button("New set")) plugin.CreateSet();
         ImGui.SameLine();
         if (ImGui.Button("New glam set")) plugin.CreateGlamSet();
+        DrawSaveCurrentGear();
         var sets = plugin.Config.Sets.Where(s => GearSearch.VisibleForJob(s, job)).ToList();
         if (sets.Count == 0)
         {
@@ -208,6 +212,35 @@ internal sealed class MainWindow : Window
                 ImGui.SetTooltip($"{status.Match.Location}\nLast checked: {checkedAt.ToLocalTime():g}\nSaved locally for this character. Reopen this storage to refresh it.");
         }
         ImGui.EndTable();
+    }
+
+    private void DrawSaveCurrentGear()
+    {
+        ImGui.BeginDisabled(plugin.SavingCurrentGear || plugin.Equipper.Running || plugin.AutoMelding.Running);
+        if (ImGui.Button("Save current gear as set"))
+        {
+            currentGearName = ""; currentGearError = ""; focusGearName = true;
+            ImGui.OpenPopup("Name current gear set");
+        }
+        ImGui.EndDisabled();
+        ImGui.SetNextWindowSize(new Vector2(440, 0), ImGuiCond.Appearing);
+        if (!ImGui.BeginPopup("Name current gear set", ImGuiWindowFlags.AlwaysAutoResize)) return;
+        ImGui.TextUnformatted($"Save equipped gear for {plugin.CurrentJob}");
+        ImGui.TextWrapped("Saves the gear you are wearing when you click Save, including materia. Empty gear slots are skipped.");
+        ImGui.SetNextItemWidth(-1);
+        if (focusGearName) { ImGui.SetKeyboardFocusHere(); focusGearName = false; }
+        ImGui.InputTextWithHint("##currentGearName", "Gear set name", ref currentGearName, 120);
+        if (!string.IsNullOrEmpty(currentGearError)) ImGui.TextWrapped(currentGearError);
+        ImGui.BeginDisabled(string.IsNullOrWhiteSpace(currentGearName) || plugin.SavingCurrentGear || plugin.Equipper.Running || plugin.AutoMelding.Running);
+        if (ImGui.Button("Save"))
+        {
+            try { plugin.SaveCurrentGear(currentGearName); ImGui.CloseCurrentPopup(); }
+            catch (Exception ex) { currentGearError = ex.Message; }
+        }
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (ImGui.Button("Cancel")) ImGui.CloseCurrentPopup();
+        ImGui.EndPopup();
     }
 
     private void DrawStorage()

@@ -19,6 +19,7 @@
     <Compile Include="../AutomaticMeldSession.cs" Link="AutomaticMeldSession.cs" />
     <Compile Include="../EquipSetSession.cs" Link="EquipSetSession.cs" />
     <Compile Include="../ZoneEquipSession.cs" Link="ZoneEquipSession.cs" />
+    <Compile Include="../CurrentGearSet.cs" Link="CurrentGearSet.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

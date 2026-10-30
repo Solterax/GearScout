@@ -41,6 +41,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<uint, string> itemNames = [];
     private Task<List<TrackedSet>>? pendingImport;
+    private (string Name, ulong Owner, string Job)? pendingGearCapture;
+    internal bool SavingCurrentGear => pendingGearCapture != null;
     private long nextScan;
     private ulong characterId;
     private long nextStorageScan;
@@ -127,6 +129,14 @@ public sealed class Plugin : IDalamudPlugin
     private void Open() => window.IsOpen = true;
     internal void CreateSet() { if (!string.IsNullOrEmpty(CurrentJob)) setEditor.Create(CurrentJob); }
     internal void CreateGlamSet() => setEditor.CreateGlam();
+    internal void SaveCurrentGear(string name)
+    {
+        if (SavingCurrentGear) throw new InvalidOperationException("A current-gear save is already pending.");
+        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 120) throw new ArgumentException("Enter a set name between 1 and 120 characters.");
+        if (characterId == 0 || string.IsNullOrEmpty(CurrentJob)) throw new InvalidOperationException("Finish loading your character first.");
+        pendingGearCapture = (name, characterId, CurrentJob);
+        Message = "Saving current gear..."; MessageIsError = false;
+    }
     internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
     internal void OpenMelding(TrackedSet set) => meldingWindow.Open(set);
     internal void EquipSet(TrackedSet set)
@@ -308,6 +318,22 @@ public sealed class Plugin : IDalamudPlugin
                     !Condition[ConditionFlag.BetweenAreas] && !Condition[ConditionFlag.BetweenAreas51];
         var job = ready ? Player.ClassJob.Value.Abbreviation.ToString().ToUpperInvariant() : "";
         var contentId = ready ? Player.ContentId : 0;
+        if (pendingGearCapture is { } capture)
+        {
+            pendingGearCapture = null;
+            try
+            {
+                if (!ready || contentId != capture.Owner || job != capture.Job)
+                    throw new InvalidOperationException("Character, job or loading changed. Try saving your gear again.");
+                if (Equipper.Running || AutoMelding.Running)
+                    throw new InvalidOperationException("Wait for equipping or automatic melding to finish before saving your current gear.");
+                var set = CurrentGearSet.Build(capture.Name, job, InventoryReader.ReadEquipped(Inventory, Data));
+                SaveLocalSet(set);
+                Message = $"Saved {set.Name}: {set.Pieces.Count} equipped pieces for {set.Job}.";
+                MessageIsError = false;
+            }
+            catch (Exception ex) { ReportError("Could not save current gear: " + ex.Message); Log.Warning(ex, "Current gear capture failed"); }
+        }
         if (job != CurrentJob || contentId != characterId || !ready)
         {
             if (contentId != characterId || !ready)
