@@ -32,7 +32,7 @@ internal sealed class MeldingWindow : Window
     public void Open(TrackedSet set)
     {
         if (set.IsGlam) return;
-        if (selectedId != set.Id) { plugin.MeldingGuide.Stop(); selections.Clear(); included.Clear(); limitInitialized = false; }
+        if (selectedId != set.Id) { plugin.AutoMelding.Stop(); selections.Clear(); included.Clear(); limitInitialized = false; }
         selectedId = set.Id; dirty = true; error = ""; IsOpen = true;
     }
 
@@ -45,7 +45,7 @@ internal sealed class MeldingWindow : Window
     {
         if (!dirty && ReferenceEquals(lastOwned, plugin.Owned) && ReferenceEquals(lastSet, set)) return;
         if (lastSet != null && !ReferenceEquals(lastSet, set) && plugin.MeldingGuide.Running)
-            plugin.MeldingGuide.Stop("Guidance stopped: target set changed. Review the new plan.");
+            plugin.AutoMelding.Session.Stop("Automatic melding stopped: target set changed. Review the new plan.");
         dirty = false; lastOwned = plugin.Owned; lastSet = set;
         plugin.MeldingData.Load();
         var suggested = MeldEligibility.SuggestCopies(set.Pieces, plugin.Owned ?? []);
@@ -77,7 +77,7 @@ internal sealed class MeldingWindow : Window
     public override void Draw()
     {
         var set = plugin.Config.Sets.FirstOrDefault(s => s.Id == selectedId && !s.IsGlam);
-        if (set == null) { plugin.MeldingGuide.Stop("Guidance stopped: set removed."); ImGui.TextUnformatted("Select a normal set from the checklist."); return; }
+        if (set == null) { plugin.AutoMelding.Session.Stop("Automatic melding stopped: set removed."); ImGui.TextUnformatted("Select a normal set from the checklist."); return; }
         if (plugin.Owned == null) { ImGui.TextUnformatted("Waiting for complete live inventory."); return; }
         Refresh(set);
         if (plugin.MeldingData.Error != null) ImGui.TextWrapped("Game-data error: " + plugin.MeldingData.Error);
@@ -175,39 +175,41 @@ internal sealed class MeldingWindow : Window
     private void DrawGuide()
     {
         var guide = plugin.MeldingGuide;
-        ImGui.TextWrapped(guide.Status);
+        ImGui.TextWrapped(plugin.AutoMelding.Session.Status);
         if (guide.Running)
         {
-            if (ImGui.Button("Stop guidance")) guide.Stop();
-            ImGui.SameLine(); ImGui.TextUnformatted($"{guide.Completed}/{guide.Total} actions; {guide.Consumed}/{guide.Limit} materia consumed");
+            if (ImGui.Button("Stop automatic melding")) plugin.AutoMelding.Stop();
+            ImGui.SameLine(); ImGui.TextUnformatted($"{guide.Completed}/{guide.Total} actions; {guide.Consumed}/{guide.Limit} materia consumed; {plugin.AutoMelding.Session.AttemptsAuthorized} attempts authorized");
             if (guide.Current is { } next)
                 ImGui.TextWrapped($"NEXT: {next.Action.Kind} {plugin.ItemName(next.Action.MateriaId)} on {plugin.ItemName(next.Copy.ItemId)} / {Label(next.Copy)} / materia slot {next.Action.Position + 1}.");
         }
         else
         {
-            ImGui.SetNextItemWidth(100); ImGui.InputInt("Material limit (all types combined)", ref materialLimit);
+            ImGui.SetNextItemWidth(100); ImGui.InputInt("Meld-attempt limit (all types combined)", ref materialLimit);
             if (ImGui.Button("Use confidence budget")) materialLimit = budget?.Items.Sum(i => i.Budget) ?? 0;
             ImGui.SameLine();
             var selected = plans.Where(p => MeldEligibility.CanGuide(p) && included.GetValueOrDefault(p.Target.Slot, true)).ToList();
             ImGui.BeginDisabled(selected.Count == 0 || materialLimit < 0);
-            if (ImGui.Button("Start guidance"))
+            if (ImGui.Button("Start automatic melding"))
             {
-                try { guide.Start(plugin.CharacterId, selected, plugin.Owned!, budget!.Items.ToDictionary(i => i.MateriaId, _ => materialLimit), materialLimit, Environment.TickCount64); }
+                try { plugin.AutoMelding.Start(selected, budget!.Items.ToDictionary(i => i.MateriaId, _ => materialLimit), materialLimit); error = ""; }
                 catch (Exception ex) { error = ex.Message; }
             }
             ImGui.EndDisabled();
-            if (selected.Count == 0) ImGui.TextWrapped("Guidance unavailable: no included live gear needs a valid melding action. See each piece's reason below.");
-            else ImGui.TextUnformatted($"Guidance includes {selected.Count} ready piece(s); other pieces are skipped.");
-            if (materialLimit < 0) ImGui.TextWrapped("Guidance unavailable: material limit cannot be negative.");
+            if (selected.Count == 0) ImGui.TextWrapped("Automatic melding unavailable: no included live gear needs a valid action. See skipped reasons below.");
+            else ImGui.TextUnformatted($"Automatic melding includes {selected.Count} ready piece(s); other pieces are skipped.");
+            if (materialLimit < 0) ImGui.TextWrapped("Material limit cannot be negative.");
             if (plans.Any(p => !MeldEligibility.CanGuide(p)) && ImGui.CollapsingHeader("Why pieces are skipped"))
                 foreach (var plan in plans.Where(p => !MeldEligibility.CanGuide(p)))
                     ImGui.TextWrapped($"{GearSearch.SlotName(plan.Target.Slot)}: {MeldEligibility.Reason(plan)}");
         }
+        ImGui.BeginDisabled(guide.Running);
         if (ImGui.Button("Open melding window")) plugin.RequestMeldingWindow();
+        ImGui.EndDisabled();
         ImGui.SameLine(); ImGui.TextUnformatted("Retrieve through the gear's in-game context menu.");
         if (!string.IsNullOrWhiteSpace(plugin.MeldingWindowStatus)) ImGui.TextWrapped(plugin.MeldingWindowStatus);
-        ImGui.TextWrapped("Perform each action in the game's dialogs. Guidance stops at a limit or an unexpected change; it cannot prevent manual spending or cancel the game's batch melding. Use single attempts to follow the limits.");
+        ImGui.TextWrapped("Start automatically retrieves and melds the planned materia, one attempt at a time. Failures retry within the material limit. Stop prevents further confirmations; an already confirmed attempt may finish. Leave the game's melding controls alone while running.");
     }
 
-    public override void OnClose() => plugin.MeldingGuide.Stop();
+    public override void OnClose() => plugin.AutoMelding.Stop();
 }

@@ -16,6 +16,7 @@
     <Compile Include="../MeldPlanner.cs" Link="MeldPlanner.cs" />
     <Compile Include="../MeldGuide.cs" Link="MeldGuide.cs" />
     <Compile Include="../MeldEligibility.cs" Link="MeldEligibility.cs" />
+    <Compile Include="../AutomaticMeldSession.cs" Link="AutomaticMeldSession.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

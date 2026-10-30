@@ -3,7 +3,7 @@
     "Author": "Solterax",
     "Name": "GearScout",
     "InternalName": "GearScout",
-    "AssemblyVersion": "0.11.2.0",
+    "AssemblyVersion": "0.12.0.0",
     "Description": "Build gear sets in game with slot and job filtered item search, or import XIVGear links. Check gear, materia and saved storage ownership, and highlight wanted missing loot.",
     "ApplicableVersion": "any",
     "Tags": [
@@ -21,8 +21,8 @@
     "RepoUrl": "https://github.com/Solterax/GearScout",
     "IsHide": false,
     "IsTestingExclusive": false,
-    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.11.2/GearScout-plugin.zip",
-    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.11.2/GearScout-plugin.zip",
-    "LastUpdate": "1793334554"
+    "DownloadLinkInstall": "https://github.com/Solterax/GearScout/releases/download/v0.12.0/GearScout-plugin.zip",
+    "DownloadLinkUpdate": "https://github.com/Solterax/GearScout/releases/download/v0.12.0/GearScout-plugin.zip",
+    "LastUpdate": "1793335506"
   }
 ]

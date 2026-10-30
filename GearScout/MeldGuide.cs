@@ -2,8 +2,8 @@ namespace GearScout;
 
 public sealed record MeldGuideStep(OwnedItem Copy, MeldAction Action);
 
-// Guidance observes actions performed in the game's own dialogs. It never confirms a meld or
-// retrieval. Limits stop this session; they cannot block manual actions or native batch melding.
+// Shared plan-progress observer. AutomaticMeldSession owns confirmation authorization and
+// calls this observer only after a single attempt's inventory result has settled.
 public sealed class MeldGuide
 {
     private List<MeldGuideStep> steps = [];
@@ -18,7 +18,7 @@ public sealed class MeldGuide
     public int Consumed => spent.Values.Sum();
     public int Limit { get; private set; }
     public MeldGuideStep? Current => Running && Completed < steps.Count ? steps[Completed] : null;
-    public string Status { get; private set; } = "Start guidance to follow the removal and melding sequence in game.";
+    public string Status { get; private set; } = "Ready for the planned removal and melding sequence.";
 
     public void Start(ulong characterId, IReadOnlyList<PieceMeldPlan> plans, IReadOnlyCollection<OwnedItem> owned,
         IReadOnlyDictionary<uint, int> materialLimits, int totalLimit, long now)
@@ -32,7 +32,7 @@ public sealed class MeldGuide
         steps = plans.SelectMany(p => p.Actions.Select(a => new MeldGuideStep(p.Copy!, a))).ToList();
         limits = materialLimits.ToDictionary(); spent.Clear(); previousStock = Stock(owned);
         Limit = totalLimit; Completed = 0; lastProgress = now; Running = steps.Count > 0;
-        Status = Running ? "Perform the highlighted next action in the game window." : "All selected gear already matches its targets.";
+        Status = Running ? "Waiting for the next planned materia action." : "All selected gear already matches its targets.";
     }
 
     public void Stop(string reason = "Guidance stopped. Your completed changes are kept.") { Running = false; Status = reason; }

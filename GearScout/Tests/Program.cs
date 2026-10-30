@@ -558,6 +558,152 @@ Check(guide.Running && guide.Total == 1, "A socketless relic cannot block guidan
 Check(MeldProbability.Budget([relicPlan, guidePlan], [Loose(1, 1)], 0.95).CompletePlan,
     "Excluded socketless gear does not make the remaining materia budget an invalid partial plan");
 
+var autoGuide = new MeldGuide();
+var automatic = new AutomaticMeldSession(autoGuide);
+long autoTime = 0;
+AutoMeldView AutoView(uint[] melds, int stock = 5) => new(100, true, [MeldCopy(melds), Loose(1, stock)],
+    true, true, true, true, true, false, true, true, false, false);
+void StartAuto(PieceMeldPlan plan, AutoMeldView view, int limit = 5)
+{
+    automatic.Stop(); autoTime = 0;
+    automatic.Start(100, [plan], view.Owned!, plan.Actions.Where(a => a.Kind == MeldActionKind.Meld).Select(a => a.MateriaId).Distinct().ToDictionary(id => id, _ => limit), limit, autoTime);
+}
+AutoMeldCommand AutoTick(AutoMeldView view, int elapsed = 350) => automatic.Tick(view, autoTime += elapsed);
+AutoMeldCommand ToDialog(AutoMeldView view)
+{
+    AutoTick(view); AutoTick(view); AutoTick(view);
+    return AutoTick(view);
+}
+var autoBefore = AutoView([]);
+StartAuto(guidePlan, autoBefore);
+Check(ToDialog(autoBefore) == AutoMeldCommand.SelectMateria && automatic.AttemptsAuthorized == 1,
+    "Automatic melding selects one materia and reserves its budget before opening confirmation");
+Check(AutoTick(autoBefore) == AutoMeldCommand.None, "A pending confirmation request is never blindly sent twice");
+Check(AutoTick(autoBefore with { DialogOpen = true }) == AutoMeldCommand.Confirm,
+    "Matching native dialog issues exactly one confirmation");
+Check(AutoTick(autoBefore with { DialogOpen = true, Busy = true }) == AutoMeldCommand.None,
+    "Confirmed attempt does not receive duplicate callbacks while busy");
+var autoAfter = AutoView([1], 4);
+AutoTick(autoAfter); AutoTick(autoAfter, 2200);
+Check(!automatic.Running && autoGuide.Completed == 1 && autoGuide.Consumed == 1,
+    "Settled gear and one-unit consumption complete the automatic action");
+StartAuto(guidePlan, autoBefore);
+Check(AutoTick(autoBefore with { WindowReady = false }) == AutoMeldCommand.OpenWindow &&
+    AutoTick(autoBefore with { WindowReady = false }) == AutoMeldCommand.None,
+    "Automatic flow opens the native window once and waits for readiness");
+Check(AutoTick(autoBefore with { CategoryMatches = false }) == AutoMeldCommand.SelectCategory,
+    "Exact inventory category is selected before gear");
+Check(AutoTick(autoBefore with { GearMatches = false }) == AutoMeldCommand.SelectGear,
+    "Exact physical gear copy is selected before materia");
+Check(AutoTick(autoBefore with { AgentReady = false }) == AutoMeldCommand.None,
+    "Native agent loading delays the next action");
+Check(AutoTick(autoBefore) == AutoMeldCommand.SelectMateria, "Melding resumes after the selected gear is ready");
+automatic.Stop();
+Check(AutoTick(autoBefore with { DialogOpen = true }) == AutoMeldCommand.None && !automatic.Running,
+    "Stop before confirmation prevents all future automatic callbacks");
+foreach (var mismatch in new[]
+{
+    autoBefore with { DialogOpen = true, RateMatches = false },
+    autoBefore with { DialogOpen = true, MateriaMatches = false },
+    autoBefore with { DialogOpen = true, DialogMatches = false },
+    autoBefore with { DialogOpen = true, GearMatches = false },
+})
+{
+    StartAuto(guidePlan, autoBefore); ToDialog(autoBefore);
+    Check(AutoTick(mismatch) == AutoMeldCommand.None && !automatic.Running,
+        "Wrong rate, materia, dialog kind or selected gear blocks automatic confirmation");
+}
+StartAuto(guidePlan, autoBefore); ToDialog(autoBefore);
+AutoTick(autoAfter with { DialogOpen = true });
+Check(automatic.Phase == AutoMeldPhase.Result, "An externally confirmed result is recognized without confirming it twice");
+AutoTick(autoAfter); AutoTick(autoAfter, 2200);
+Check(!automatic.Running && autoGuide.Completed == 1, "Already-started external confirmation still requires verified inventory outcome");
+StartAuto(guidePlan, autoBefore); ToDialog(autoBefore); AutoTick(autoBefore with { DialogOpen = true });
+var excessConsumption = AutoView([1], 3);
+AutoTick(excessConsumption); AutoTick(excessConsumption, 2200);
+Check(!automatic.Running && automatic.Status.Contains("consumption"), "More than one consumed materia stops further attempts");
+StartAuto(advancedGuidePlan, AutoView([1], 2), 1);
+var failedBefore = AutoView([1], 2);
+ToDialog(failedBefore); AutoTick(failedBefore with { DialogOpen = true });
+var failedAfter = AutoView([1], 1);
+AutoTick(failedAfter); AutoTick(failedAfter, 2200);
+Check(!automatic.Running && automatic.AttemptsAuthorized == 1 && autoGuide.Consumed == 1,
+    "Failed attempt at the material limit never authorizes a retry");
+StartAuto(advancedGuidePlan, AutoView([1], 5), 3);
+var advancedBefore = AutoView([1], 5);
+ToDialog(advancedBefore); AutoTick(advancedBefore with { DialogOpen = true });
+var advancedFailed = AutoView([1], 4);
+AutoTick(advancedFailed); AutoTick(advancedFailed, 2200);
+Check(automatic.Running && automatic.AttemptsAuthorized == 1 && autoGuide.Completed == 0,
+    "A settled failed overmeld remains on the same planned step within budget");
+Check(ToDialog(advancedFailed) == AutoMeldCommand.SelectMateria && automatic.AttemptsAuthorized == 2,
+    "Retry reserves a separate single-attempt authorization");
+AutoTick(advancedFailed with { DialogOpen = true });
+var advancedSuccess = AutoView([1, 1], 3);
+AutoTick(advancedSuccess); AutoTick(advancedSuccess, 2200);
+Check(!automatic.Running && autoGuide.Completed == 1 && autoGuide.Consumed == 2,
+    "Success after failure completes the step with both attempts counted");
+var retrieveOnly = MeldPlanner.Build(MeldTarget(), MeldCopy([1]), armorRules, materiaRules);
+foreach (var recovered in new[] {0, 1})
+{
+    var retrieveBefore = AutoView([1], 0);
+    StartAuto(retrieveOnly, retrieveBefore, 0);
+    Check(ToDialog(retrieveBefore) == AutoMeldCommand.RequestRetrieve && automatic.AttemptsAuthorized == 0,
+        "Automatic retrieval follows the plan without consuming a meld authorization");
+    AutoTick(retrieveBefore with { DialogOpen = true, MateriaMatches = false });
+    var retrieveAfter = AutoView([], recovered);
+    AutoTick(retrieveAfter); AutoTick(retrieveAfter, 2200);
+    Check(!automatic.Running && autoGuide.Completed == 1 && autoGuide.Consumed == 0,
+        "Both recovered and destroyed retrieval outcomes advance after gear verification");
+}
+foreach (var interrupted in new[]
+{
+    autoBefore with { Ready = false }, autoBefore with { Owner = 200 }, autoBefore with { Owned = null },
+    autoBefore with { UnexpectedDialog = true }, autoBefore with { DialogOpen = true },
+    autoBefore with { Owned = new[] {MeldCopy([], slot: 9), Loose(1, 5)} },
+})
+{
+    StartAuto(guidePlan, autoBefore);
+    Check(AutoTick(interrupted) == AutoMeldCommand.None && !automatic.Running,
+        "Loading, character, inventory, unexpected dialogs and moved copies stop automation");
+}
+StartAuto(guidePlan, autoBefore); ToDialog(autoBefore);
+Check(AutoTick(autoBefore, 25001) == AutoMeldCommand.None && !automatic.Running,
+    "Missing native confirmation times out without repeating a request");
+StartAuto(guidePlan, autoBefore); ToDialog(autoBefore); AutoTick(autoBefore with { DialogOpen = true });
+Check(AutoTick(autoBefore, 25001) == AutoMeldCommand.None && !automatic.Running,
+    "Unacknowledged result times out instead of blindly retrying");
+automatic.Stop();
+Reject(() => automatic.Start(100, [guidePlan], autoBefore.Owned!, new Dictionary<uint, int> { [1] = 0 }, 0, 0),
+    "Budget below the guaranteed minimum is rejected before any removal can start");
+Reject(() => automatic.Start(100, [guidePlan], AutoView([], 0).Owned!, new Dictionary<uint, int> { [1] = 5 }, 5, 0),
+    "Missing minimum bag stock is rejected before removing existing materia");
+Check(!automatic.Running, "Failed automation preflight does not leave a running workflow");
+var fullPlan = rebuild;
+var fullStock = new Dictionary<uint, int> { [1] = 5, [2] = 5, [3] = 0 };
+uint[] fullMelds = [3, 1];
+AutoMeldView FullView() => autoBefore with
+{
+    Owned = new[] {MeldCopy(fullMelds)}.Concat(fullStock.Where(p => p.Value > 0).Select(p => Loose(p.Key, p.Value, (int)p.Key + 1))).ToArray(),
+};
+automatic.Stop(); autoTime = 0;
+automatic.Start(100, [fullPlan], FullView().Owned!, new Dictionary<uint, int> { [1] = 5, [2] = 5 }, 5, 0);
+var issued = new List<AutoMeldCommand>();
+foreach (var action in fullPlan.Actions)
+{
+    var view = FullView();
+    issued.Add(ToDialog(view));
+    Check(AutoTick(view with { DialogOpen = true }) == AutoMeldCommand.Confirm, "Each planned retrieval or meld has its own verified confirmation");
+    fullMelds = action.After.ToArray();
+    fullStock[action.MateriaId] += action.Kind == MeldActionKind.Retrieve ? 1 : -1;
+    AutoTick(FullView()); AutoTick(FullView(), 2200);
+}
+Check(!automatic.Running && autoGuide.Completed == fullPlan.Actions.Count && autoGuide.Consumed == 2 && automatic.AttemptsAuthorized == 2 &&
+    issued.SequenceEqual(new[] {AutoMeldCommand.RequestRetrieve, AutoMeldCommand.RequestRetrieve, AutoMeldCommand.SelectMateria, AutoMeldCommand.SelectMateria}),
+    "Automation retrieves bottom-first then automatically melds each new planned materia in sequence");
+
+Check(!automatic.Running, "The final verified result leaves no queued automation commands");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

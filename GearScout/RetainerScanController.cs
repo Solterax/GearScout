@@ -12,7 +12,7 @@ internal sealed unsafe class RetainerScanController(Plugin plugin)
     public RetainerScanSession Session { get; } = new();
     private bool startRequested;
     private DateTimeOffset inventoryOpenedAt;
-    public bool CanStart => Plugin.GameGui.GetAddonByName("RetainerList").IsVisible && Plugin.GameGui.GetAddonByName("RetainerList").IsReady &&
+    public bool CanStart => !plugin.AutoMelding.Running && Plugin.GameGui.GetAddonByName("RetainerList").IsVisible && Plugin.GameGui.GetAddonByName("RetainerList").IsReady &&
         !Plugin.GameGui.GetAddonByName("SelectString").IsVisible &&
         !Plugin.GameGui.GetAddonByName("InventoryRetainer").IsVisible && !Plugin.GameGui.GetAddonByName("InventoryRetainerLarge").IsVisible;
     public void RequestStart() => startRequested = true;

@@ -62,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     internal GearCatalog Catalog { get; }
     internal MeldData MeldingData { get; }
     internal MeldGuide MeldingGuide { get; } = new();
+    internal AutomaticMeldController AutoMelding { get; }
     internal string MeldingWindowStatus { get; private set; } = "";
     internal RetainerScanController RetainerScan { get; }
     internal bool StorageSavePending => storageSavePending;
@@ -79,6 +80,7 @@ public sealed class Plugin : IDalamudPlugin
         window = new MainWindow(this);
         Catalog = new GearCatalog(Data);
         MeldingData = new MeldData(Data);
+        AutoMelding = new AutomaticMeldController(this);
         meldingWindow = new MeldingWindow(this);
         RetainerScan = new RetainerScanController(this);
         setEditor = new SetEditorWindow(this);
@@ -239,7 +241,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         if (ready) UpdateStorage();
         else wantedItems.Suspend();
-        if (!ready) MeldingGuide.Observe(characterId, false, null, Environment.TickCount64);
+        if (!ready && AutoMelding.Running) AutoMelding.Session.Stop("Automatic melding stopped: character or loading changed.");
         if (openMeldRequested)
         {
             openMeldRequested = false;
@@ -260,19 +262,19 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
         if (!ready || Environment.TickCount64 < nextScan) return;
-        nextScan = Environment.TickCount64 + 1000;
+        nextScan = Environment.TickCount64 + (AutoMelding.Running ? 150 : 1000);
         try
         {
             var live = InventoryReader.Read(Inventory, Data);
             Owned = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
-            MeldingGuide.Observe(characterId, ready, Owned, Environment.TickCount64);
+            AutoMelding.Update(ready);
             UpdateWantedNotifications(live);
         }
         catch (Exception ex)
         {
             Owned = null;
             wantedItems.Suspend();
-            MeldingGuide.Stop("Guidance stopped: live inventory is unavailable.");
+            AutoMelding.Session.Stop("Automatic melding stopped: live inventory is unavailable.");
             nextScan = Environment.TickCount64 + 5000;
             Log.Warning(ex, "Could not read character inventory");
         }
@@ -398,7 +400,7 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         RetainerScan.Stop();
-        MeldingGuide.Stop();
+        AutoMelding.Stop();
         Inventory.InventoryChanged -= OnInventoryChanged;
         AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
         AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);
