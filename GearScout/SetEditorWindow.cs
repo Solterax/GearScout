@@ -31,6 +31,7 @@ internal sealed class SetEditorWindow(Plugin plugin) : Window("Build gear set###
 
     public void Open(TrackedSet source, string? initialSlot = null)
     {
+        plugin.Catalog.Request();
         draft = GearSearch.Draft(source);
         name = draft.Name;
         error = "";

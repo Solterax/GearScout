@@ -41,7 +41,6 @@ public sealed class WantedItemTracker
     {
         SelectCharacter(characterId);
         if (characterId == 0 || owned == null) return [];
-        var missingBySet = sets.Select(s => (Set: s, Missing: LootMatcher.MissingItems([s], owned))).ToList();
         var notices = new List<WantedItemNotice>();
         foreach (var entry in loot)
         {
@@ -52,7 +51,14 @@ public sealed class WantedItemTracker
             lootHistory.Enqueue(key);
             // Keep recent resolved entries too: window reopenings and slot reordering cannot repeat messages.
             while (lootHistory.Count > 4096) seenLoot.Remove(lootHistory.Dequeue());
-            var labels = Labels(missingBySet.Where(s => s.Missing.Contains(id)).Select(s => s.Set));
+            // Most polls have no new eligible loot. For a new entry, count its owned copies
+            // once rather than building a full inventory dictionary for every saved set.
+            var copies = owned.Where(i => i.Quantity > 0 && LootMatcher.BaseItemId(i.ItemId) == id).Sum(i => (long)i.Quantity);
+            var labels = Labels(sets.Where(s =>
+            {
+                var required = s.Pieces.Count(p => p.ItemId == id);
+                return required > 0 && copies < (s.IsGlam ? 1 : required);
+            }));
             if (labels.Count > 0) notices.Add(new(id, labels));
         }
         return notices;

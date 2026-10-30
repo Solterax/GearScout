@@ -9,6 +9,8 @@ internal sealed class GearCatalog(IDataManager data) : IDisposable
     private IEnumerator<Item>? rows;
     private readonly List<GearCandidate> items = [];
     private readonly Dictionary<uint, ulong> jobs = [];
+    private bool requested;
+    public void Request() => requested = true;
     public bool Ready { get; private set; }
     public string? Error { get; private set; }
     public IReadOnlyList<GearCandidate> Items => items;
@@ -16,12 +18,12 @@ internal sealed class GearCatalog(IDataManager data) : IDisposable
     // Build from local game sheets in small framework-thread batches, never on every keystroke.
     public void Update()
     {
-        if (Ready || Error != null) return;
+        if (!requested || Ready || Error != null) return;
         try
         {
             rows ??= data.GetExcelSheet<Item>().GetEnumerator();
             var timer = Stopwatch.StartNew();
-            while (timer.ElapsedMilliseconds < 2)
+            while (timer.Elapsed.TotalMilliseconds < 0.5)
             {
                 if (!rows.MoveNext()) { Ready = true; rows.Dispose(); rows = null; return; }
                 var row = rows.Current;

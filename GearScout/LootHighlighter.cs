@@ -45,7 +45,7 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
         if (addon == null || !addon->IsVisible || !Visible(addon->RootNode)) return;
         var loot = Loot.Instance();
         if (loot == null) return;
-        var targets = LootMatcher.MissingItems(plugin.Config.Sets, plugin.Owned);
+        var targets = plugin.MissingLootTargets;
         if (targets.Count == 0) return;
 
         // NeedGreed's item list is node 6. Validate its component type before casting.
@@ -123,7 +123,7 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
                 Plugin.GameGui.GameUiHidden || !addon->IsVisible) return;
             var loot = Loot.Instance();
             if (loot == null) return;
-            var targets = LootMatcher.MissingItems(plugin.Config.Sets, plugin.Owned);
+            var targets = plugin.MissingLootTargets;
             if (targets.Count == 0) return;
             var rolls = new List<LootRollEntry>(loot->Items.Length);
             foreach (ref readonly var entry in loot->Items)

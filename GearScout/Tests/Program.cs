@@ -347,6 +347,14 @@ Check(dropFind.ObserveLoot(100, noticeSets, [], [new(505, 0, 1_000_100, true)]).
     "Wanted-drop messages normalize HQ IDs");
 Check(dropFind.ObserveLoot(200, noticeSets, [], [drop]).Count == 1,
     "Drop deduplication is isolated by character");
+var ringNoticeSets = new List<TrackedSet>
+{
+    new() { Name = "Two rings", Job = "BRD", Pieces = [new() { ItemId = 100 }, new() { ItemId = 100 }] },
+    new() { Name = "Appearance", IsGlam = true, Pieces = [new() { ItemId = 100 }, new() { ItemId = 100 }] },
+};
+var ringDrop = new WantedItemTracker().ObserveLoot(100, ringNoticeSets, hat100, [drop]);
+Check(ringDrop.Count == 1 && ringDrop[0].Sets.SequenceEqual(new[] { "Two rings (BRD)" }),
+    "Drop matching counts duplicate normal targets but shares owned appearances for glam collections");
 
 var retainerScan = new RetainerScanSession();
 RetainerScanTarget[] retainers = [new(10, "First"), new(20, "Second"), new(10, "Duplicate"), new(0, "Invalid")];
@@ -841,6 +849,32 @@ equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1]), GearInBag(102, 2)], 2);
 equip.Tick(100, "BRD", true, false, [Worn(999, 2), GearInBag(102, 2)], 400);
 Check(!equip.Running && equip.Results[0].Kind == EquipResultKind.Failed && equip.Results[1].Kind == EquipResultKind.NotProcessed,
     "Changing completed equipment cancels the pass and does not leave a false equipped result");
+
+var comparisonStorage = new List<StorageSnapshot>();
+StoredItem Stored(uint id, List<uint>? melds = null, bool? hq = false, int count = 1) =>
+    new() { ItemId = id, Quantity = count, Materia = melds, HighQuality = hq };
+StorageCache.Replace(comparisonStorage, Snapshot(100, "comparison", Stored(10, [1, 2]), Stored(20), Stored(20)));
+Check(!StorageCache.Replace(comparisonStorage, Snapshot(100, "comparison", Stored(20), Stored(10, [1, 2]), Stored(20))),
+    "Storage reorder preserves an unchanged snapshot including duplicate copies");
+Check(StorageCache.Replace(comparisonStorage, Snapshot(100, "comparison", Stored(20), Stored(10, [1, 2]), Stored(10, [1, 2]))),
+    "Same item count with different duplicate multiplicities updates storage");
+foreach (var replacement in new[] { Stored(10, [2, 1]), Stored(10, []), Stored(10, null), Stored(10, [1, 2], true), Stored(10, [1, 2], false, 2) })
+{
+    comparisonStorage.Clear();
+    StorageCache.Replace(comparisonStorage, Snapshot(100, "comparison", Stored(10, [1, 2])));
+    Check(StorageCache.Replace(comparisonStorage, Snapshot(100, "comparison", replacement)),
+        "Storage comparison detects ordered meld, unknown meld, quality and quantity changes");
+}
+var originalCopy = new OwnedItem(10, 1, "Bag", false, new uint[] { 1, 2 }) { Container = 1, InventorySlot = 2, HighQuality = false };
+Check(StorageCache.SameOwnership([originalCopy], [originalCopy with { Materia = new uint[] { 1, 2 } }]),
+    "Fresh identical inventory data preserves cached UI plans");
+foreach (var changedCopy in new[] { originalCopy with { Materia = new uint[] { 2, 1 } }, originalCopy with { Materia = null },
+    originalCopy with { InventorySlot = 3 }, originalCopy with { Container = 2 }, originalCopy with { Equipped = true },
+    originalCopy with { HighQuality = true }, originalCopy with { Quantity = 2 }, originalCopy with { ItemId = 20 },
+    originalCopy with { StorageKey = "other" }, originalCopy with { LastCheckedUtc = checkedAt }, originalCopy with { Location = "Other" } })
+    Check(!StorageCache.SameOwnership([originalCopy], [changedCopy]), "Ownership changes invalidate cached UI plans");
+Check(!StorageCache.SameOwnership([originalCopy], null) && !StorageCache.SameOwnership(null, [originalCopy]) &&
+    !StorageCache.SameOwnership([originalCopy], []), "Unreadable or removed ownership invalidates cached plans");
 
 if (args.Contains("--live"))
 {

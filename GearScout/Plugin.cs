@@ -49,6 +49,20 @@ public sealed class Plugin : IDalamudPlugin
     private long storageRefreshUntil;
     private bool storageRefreshPending;
     private long storageTransferUntil;
+    private List<OwnedItem>? lootOwnership;
+    private HashSet<uint>? missingLootTargets;
+    internal HashSet<uint> MissingLootTargets
+    {
+        get
+        {
+            if (missingLootTargets == null || !ReferenceEquals(lootOwnership, Owned))
+            {
+                missingLootTargets = LootMatcher.MissingItems(Config.Sets, Owned);
+                lootOwnership = Owned;
+            }
+            return missingLootTargets;
+        }
+    }
     private static readonly string[] StorageAddons = ["InventoryRetainer", "InventoryRetainerLarge", "RetainerCharacter", "MiragePrismPrismBox", "Cabinet", "CabinetWithdraw", "InventoryBuddy"];
 
     internal Configuration Config { get; }
@@ -274,7 +288,9 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             var live = InventoryReader.Read(Inventory, Data);
-            Owned = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
+            var ownership = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
+            // Keep UI plans cached while still reading fresh native slots for automation validation.
+            if (!StorageCache.SameOwnership(Owned, ownership)) Owned = ownership;
             AutoMelding.Update(ready);
             Equipper.Update(ready);
             UpdateWantedNotifications(live);
@@ -402,6 +418,7 @@ public sealed class Plugin : IDalamudPlugin
 
     internal void Save()
     {
+        missingLootTargets = null;
         PluginInterface.SavePluginConfig(Config);
         storageSavePending = false;
     }

@@ -30,7 +30,7 @@ public static class StorageCache
         {
             var previous = snapshots[index];
             // Store item changes immediately; refresh unchanged timestamps at most every 30 seconds.
-            if (!forceTimestamp && previous.Name == incoming.Name && Fingerprint(previous.Items) == Fingerprint(incoming.Items) &&
+            if (!forceTimestamp && previous.Name == incoming.Name && SameItems(previous.Items, incoming.Items) &&
                 incoming.CheckedAtUtc - previous.CheckedAtUtc < TimeSpan.FromSeconds(30)) return false;
             snapshots[index] = incoming;
         }
@@ -48,7 +48,52 @@ public static class StorageCache
                 s.Name + " (saved)", false, i.Materia, s.CheckedAtUtc) { HighQuality = i.HighQuality, StorageKey = s.Key }))).ToList();
     }
 
-    private static string Fingerprint(IEnumerable<StoredItem> items) => string.Join(";", items.Select(i =>
-        $"{i.ItemId}:{i.Quantity}:{i.HighQuality}:" + (i.Materia == null ? "?" : string.Join(",", i.Materia)))
-        .Order(StringComparer.Ordinal));
+    private static bool SameItems(List<StoredItem> left, List<StoredItem> right)
+    {
+        if (left.Count != right.Count) return false;
+        // Scanners normally return the same slot order. Compare directly without sorting or strings.
+        if (left.SequenceEqual(right, ItemComparer.Instance)) return true;
+        // Storage ordering may change without changing contents; preserve duplicate multiplicities.
+        var counts = new Dictionary<StoredItem, int>(ItemComparer.Instance);
+        foreach (var item in left) counts[item] = counts.GetValueOrDefault(item) + 1;
+        foreach (var item in right)
+        {
+            if (!counts.TryGetValue(item, out var count) || count == 0) return false;
+            counts[item] = count - 1;
+        }
+        return true;
+    }
+
+    public static bool SameOwnership(IReadOnlyList<OwnedItem>? left, IReadOnlyList<OwnedItem>? right)
+    {
+        if (ReferenceEquals(left, right)) return true;
+        if (left == null || right == null || left.Count != right.Count) return false;
+        for (var index = 0; index < left.Count; index++)
+        {
+            var a = left[index]; var b = right[index];
+            if (a.ItemId != b.ItemId || a.Quantity != b.Quantity || a.Location != b.Location || a.Equipped != b.Equipped ||
+                a.Container != b.Container || a.InventorySlot != b.InventorySlot || a.HighQuality != b.HighQuality ||
+                a.StorageKey != b.StorageKey || a.LastCheckedUtc != b.LastCheckedUtc || !SameMateria(a.Materia, b.Materia)) return false;
+        }
+        return true;
+    }
+
+    private static bool SameMateria(IReadOnlyList<uint>? a, IReadOnlyList<uint>? b) =>
+        ReferenceEquals(a, b) || (a != null && b != null && a.SequenceEqual(b));
+
+    private sealed class ItemComparer : IEqualityComparer<StoredItem>
+    {
+        public static readonly ItemComparer Instance = new();
+        public bool Equals(StoredItem? a, StoredItem? b) => ReferenceEquals(a, b) ||
+            (a != null && b != null && a.ItemId == b.ItemId && a.Quantity == b.Quantity &&
+             a.HighQuality == b.HighQuality && SameMateria(a.Materia, b.Materia));
+        public int GetHashCode(StoredItem item)
+        {
+            var hash = new HashCode();
+            hash.Add(item.ItemId); hash.Add(item.Quantity); hash.Add(item.HighQuality);
+            hash.Add(item.Materia != null);
+            if (item.Materia != null) foreach (var id in item.Materia) hash.Add(id);
+            return hash.ToHashCode();
+        }
+    }
 }
