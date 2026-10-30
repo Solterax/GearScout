@@ -93,7 +93,9 @@ internal sealed class MeldingWindow : Window
             ImGui.TextUnformatted($"Chance with bag stock, before refunds: {budget.CompletionChance:P1} {(budget.CompletePlan ? "for this plan" : "for valid pieces only — incomplete plan")}");
             ImGui.TextWrapped("Budgets combine all planned melds and exclude potential retrieval refunds. Separate material-type budgets jointly meet the selected confidence. Saddlebag and retainer stock must be moved into bags first.");
         }
-        if (ImGui.BeginChild("meldContents", new Vector2(0, 405), true))
+        var requirementsHeight = ((budget?.Items.Count ?? 0) * 2 + 1) * ImGui.GetTextLineHeightWithSpacing();
+        var gearHeight = Math.Clamp(405 - requirementsHeight, 180, 405);
+        if (ImGui.BeginChild("meldContents", new Vector2(0, gearHeight), true))
         {
             if (ImGui.BeginTable("meldPieces", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.Resizable))
             {
@@ -144,23 +146,9 @@ internal sealed class MeldingWindow : Window
                 }
                 ImGui.EndTable();
             }
-            ImGui.Separator();
-            if (budget != null && ImGui.BeginTable("materiaBudget", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
-            {
-                foreach (var title in new[] { "Materia", "Bags", "Saddlebags", "Retainers", "Minimum", "Average", "Budget", "Get more" }) ImGui.TableSetupColumn(title);
-                ImGui.TableHeadersRow();
-                foreach (var row in budget.Items)
-                {
-                    ImGui.TableNextRow();
-                    foreach (var text in new[] { plugin.ItemName(row.MateriaId), row.Bags.ToString(), row.Saddlebags.ToString(), row.Retainers.ToString(), row.Minimum.ToString(), row.Average.ToString("F1"), row.Budget.ToString(), row.Additional.ToString() })
-                    { ImGui.TableNextColumn(); ImGui.TextWrapped(text); }
-                }
-                ImGui.EndTable();
-            }
-            var refunds = plans.Where(p => p.Valid).SelectMany(p => p.Actions).Where(a => a.Kind == MeldActionKind.Retrieve).GroupBy(a => a.MateriaId);
-            foreach (var refund in refunds) ImGui.TextWrapped($"Potential recovery: {plugin.ItemName(refund.Key)} — remove {refund.Count()}, average returned {refund.Sum(a => a.Chance):F1}. Not counted as stock until retrieved.");
         }
         ImGui.EndChild();
+        DrawMateriaRequirements();
         DrawGuide();
         if (!string.IsNullOrEmpty(error)) ImGui.TextWrapped(error);
         if (editingPiece != null) { targets.Open(editingPiece); editingPiece = null; }
@@ -170,6 +158,25 @@ internal sealed class MeldingWindow : Window
             try { plugin.SaveLocalSet(editing); selectedId = editing.Id; dirty = true; limitInitialized = false; editing = null; error = ""; }
             catch (Exception ex) { error = ex.Message; }
         }
+    }
+
+    private void DrawMateriaRequirements()
+    {
+        ImGui.Separator();
+        if (budget != null && ImGui.BeginTable("materiaBudget", 8, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+            foreach (var title in new[] { "Materia", "Bags", "Saddlebags", "Retainers", "Minimum", "Average", "Budget", "Get more" }) ImGui.TableSetupColumn(title);
+            ImGui.TableHeadersRow();
+            foreach (var row in budget.Items)
+            {
+                ImGui.TableNextRow();
+                foreach (var text in new[] { plugin.ItemName(row.MateriaId), row.Bags.ToString(), row.Saddlebags.ToString(), row.Retainers.ToString(), row.Minimum.ToString(), row.Average.ToString("F1"), row.Budget.ToString(), row.Additional.ToString() })
+                { ImGui.TableNextColumn(); ImGui.TextWrapped(text); }
+            }
+            ImGui.EndTable();
+        }
+        var refunds = plans.Where(p => p.Valid).SelectMany(p => p.Actions).Where(a => a.Kind == MeldActionKind.Retrieve).GroupBy(a => a.MateriaId);
+        foreach (var refund in refunds) ImGui.TextWrapped($"Potential recovery: {plugin.ItemName(refund.Key)} — remove {refund.Count()}, average returned {refund.Sum(a => a.Chance):F1}. Not counted as stock until retrieved.");
     }
 
     private void DrawGuide()
