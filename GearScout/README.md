@@ -1,4 +1,4 @@
-# GearScout 0.12.1
+# GearScout 0.13.0
 
 A first version of a Dalamud plugin for importing XIVGear gear sets and checking which pieces your current character owns.
 
@@ -27,6 +27,8 @@ For job-independent outfit planning, click **New glam set**. Slot searches show 
 Glam slots support lists of pieces. Click **Add gear...** in the editor, check as many search results as wanted, then **Done** and **Save set**. Search remains open for repeated selections and queries. Uncheck a result or use its individual **Remove** button to remove just that piece. Every selected piece appears in the checklist, grouped by slot with its own ownership status and location. Identical items are not duplicated within a slot; normal sets retain a single item per slot. Existing glam sets use the same saved format and can be extended without migration.
 
 ## Ownership rules
+
+**Equip selected set** is available for normal sets on the current job. It selects live bag/Armoury copies with copy-aware allocation, prefers planned meld matches and then HQ, preserves already-correct destinations, issues one native gear-slot swap at a time and verifies the equipped ID/quality/melds before continuing. Missing slots and unlisted slots stay unchanged. Result rows and local chat identify missing, saved-only, rejected and unprocessed pieces separately. Cache-only gear requires withdrawal first. Stop/window close, combat/busy state, character/job/loading changes, changed targets or unexpected completed-slot changes cancel remaining requests. It does not alter melds, create a native gearset, apply glamour or switch jobs.
 
 - Checks equipped items, all four inventory bags, and the Armoury Chest of the logged-in character.
 - Updates approximately once per second while the window is open; login, loading and character/job changes clear the old snapshot.
@@ -103,6 +105,7 @@ Manual acceptance checks:
 30. Start automatic melding on a small plan containing retrieval and replacement. Confirm native selection matches the exact copy, correct bottom-first removal and correct next materia. Test a failed overmeld followed by retry and success, and a failure at the attempt limit. Verify each request is single-attempt, reservations precede confirmations, and gear/stock results settle before another request. Test Stop before/after confirmation, changed success rate, unavailable/consumed stock, moved/replaced gear, edited targets, unexpected dialogs, loading and character changes. Do not manually operate the meld interface during the run. Native callbacks and end-to-end timing require in-game verification.
 31. Include a socketless relic with unreadable meld data in an otherwise usable set. Verify it is labeled excluded, has no target-edit/action controls and does not block ready live pieces. Check Include selection and skipped reasons for incomplete, already-correct and saved-only pieces. Confirm live copies are preferred over saved copies. Open melding with the general-action button and verify success/blocked/timeout feedback; no materia should be spent by opening alone.
 32. Open the standard saddlebag and, if available, premium tab; wait for complete loading. Confirm independent saved rows and ownership after closing/reloading. Move wanted gear and loose materia in/out, switch tabs and close immediately after transfers; verify no duplicated/stale copies after the refresh. Unavailable or partially loaded premium pages must retain an older saved check. Verify saddlebag-only gear suppresses loot highlights and withdrawal does not trigger a new-item notice. Planner saddlebag supply must remain unusable until transferred into bags.
+33. Equip a normal current-job set containing already-worn gear, bag and Armoury pieces, missing pieces and saddlebag/retainer-only pieces. Verify each accessible copy is equipped and all other pieces are named in the result and local chat. Test different/identical rings, one versus two copies, planned materia differences, HQ ties and earlier swaps relocating later candidates. Test game-rejected/high-level items, full inventory, Stop, window close, combat, zoning, job changes and editing/removing the target. No native gearset should be created, no materia changed, and no cached storage item should be remotely moved. Native equip swaps still require in-game verification.
 
 ## Implementation and references
 

@@ -124,7 +124,31 @@ internal sealed class MainWindow : Window
             ImGui.EndPopup();
         }
 
-        if (!selected.IsGlam && ImGui.Button("Melding planner")) plugin.OpenMelding(selected);
+        if (!selected.IsGlam)
+        {
+            if (ImGui.Button("Melding planner")) plugin.OpenMelding(selected);
+            ImGui.SameLine();
+            if (plugin.Equipper.Running)
+            {
+                if (ImGui.Button("Stop equipping")) plugin.Equipper.Stop();
+            }
+            else
+            {
+                ImGui.BeginDisabled(plugin.Owned == null || plugin.AutoMelding.Running || plugin.RetainerScan.Session.Running || selected.Pieces.Count == 0);
+                if (ImGui.Button("Equip selected set")) plugin.EquipSet(selected);
+                ImGui.EndDisabled();
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip("Equips available pieces for your current job from bags and Armoury Chest. Reports missing items and stored pieces that must be withdrawn first. Does not change materia.");
+            }
+        }
+        else if (plugin.Equipper.Running && ImGui.Button("Stop equipping")) plugin.Equipper.Stop();
+        if (!string.IsNullOrWhiteSpace(plugin.Equipper.Session.Status))
+        {
+            ImGui.TextWrapped(plugin.Equipper.Session.Status);
+            if (plugin.Equipper.Session.Results.Count > 0 && ImGui.CollapsingHeader("Equip results"))
+                foreach (var result in plugin.Equipper.Session.Results)
+                    ImGui.TextWrapped($"{GearSearch.SlotName(result.Piece.Slot)} — {plugin.ItemName(result.Piece.ItemId)}: {result.Details}");
+        }
         if (selected.Pieces.Count == 0) ImGui.TextWrapped("This set is empty. Click Edit set to choose gear for its slots.");
         var owned = plugin.Owned;
         if (owned == null)
@@ -272,6 +296,8 @@ internal sealed class MainWindow : Window
         try { plugin.Save(); }
         catch (Exception ex) { plugin.ReportError($"Could not save settings: {ex.Message}"); }
     }
+
+    public override void OnClose() { if (plugin.Equipper.Running) plugin.Equipper.Stop("GearScout window closed."); }
 
     private static string SlotName(string slot) => slot switch
     {

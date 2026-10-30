@@ -18,6 +18,7 @@ internal sealed unsafe class AutomaticMeldController
         if (Open("MateriaAttachDialog") || Open("MateriaRetrieveDialog") || Open("SelectYesno") || Busy())
             throw new InvalidOperationException("Close confirmation dialogs and finish the current action before starting automatic melding.");
         if (plugin.RetainerScan.Session.Running) throw new InvalidOperationException("Stop the retainer scan before starting automatic melding.");
+        if (plugin.Equipper.Running) throw new InvalidOperationException("Finish equipping the selected set before starting automatic melding.");
         Session.Start(plugin.CharacterId, plans, plugin.Owned ?? throw new InvalidOperationException("Inventory is unavailable."), limits, totalLimit, Environment.TickCount64);
         boundTargets = plans.Select(p => (p.Target, p.Target.ItemId, p.Target.Slot, p.Target.Materia!.ToArray())).ToList();
     }

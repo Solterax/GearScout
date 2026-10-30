@@ -66,6 +66,14 @@ For example: `[GearScout] Wanted loot dropped: Example Hat — for Bard plan (BR
 
 The first complete inventory scan after login, reload or loading establishes a silent baseline. Existing inventory, cached storage items, extra copies of a known item and set edits do not produce acquisition messages. Checking storage is silent; transfers while storage is open or shortly after closing are also suppressed. During a monitored character session, an item already observed as owned is not announced again if it is moved, removed and reacquired. Missing or unvisited storage is still limited by the last-known ownership checks described below. These messages appear only in your local chat; GearScout does not post to party or other players.
 
+## Equip a saved set
+
+Select a normal set for your current job and click **Equip selected set**. GearScout equips found copies from your bags and Armoury Chest one piece at a time and verifies each result. Already-correct pieces stay equipped; missing or unlisted slots are left alone. It allocates separate ring copies, prefers correctly melded copies, then HQ when otherwise tied, and handles items relocated by earlier swaps.
+
+The result appears under **Equip results** and in local chat. Each unavailable piece is named with its slot and reason: missing from checked ownership, found in a saved storage location and requiring withdrawal, or found but unable to equip. Cached saddlebag/retainer/dresser/armoire gear must first be moved into live inventory. Melds are not changed and the character's job is not switched.
+
+**Stop equipping** or closing the GearScout window prevents further requests; a move already requested can still finish. Combat, loading, character/job changes, edited/removed targets or unexpected changes to completed gear stop the pass. Retainer scans and automatic melding cannot run at the same time. Glam lists have no equip button because they can contain multiple alternatives per slot.
+
 ## Melding planner
 
 Select a normal gear set and click **Melding planner**. Glam lists do not use melding plans.

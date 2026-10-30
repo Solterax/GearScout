@@ -60,7 +60,8 @@ public static class GearMatcher
 {
     // Allocate physical copies once per set. One ring cannot satisfy two slots.
     // Rings can be worn on either hand; allocation is based on item ID, not slot.
-    public static List<PieceStatus> Match(IEnumerable<GearPiece> pieces, IEnumerable<OwnedItem> inventory, bool appearanceOnly = false)
+    public static List<PieceStatus> Match(IEnumerable<GearPiece> pieces, IEnumerable<OwnedItem> inventory, bool appearanceOnly = false,
+        Func<GearPiece, OwnedItem, int>? preference = null)
     {
         var targets = pieces.ToList();
         var owned = inventory.Where(i => i.Quantity > 0).OrderByDescending(i => i.Equipped).ToList();
@@ -86,7 +87,7 @@ public static class GearMatcher
                     for (var slot = 0; slot < slots.Count; slot++)
                     {
                         if ((mask & (1 << slot)) != 0) continue;
-                        var score = state.Score + Score(slots[slot].piece, item);
+                        var score = state.Score + Score(slots[slot].piece, item) + (preference?.Invoke(slots[slot].piece, item) ?? 0);
                         var newMask = mask | (1 << slot);
                         if (next[newMask] != null && next[newMask]!.Score >= score) continue;
                         var assigned = (OwnedItem?[])state.Items.Clone();

@@ -738,6 +738,110 @@ saddleNotice.ObserveOwnership(100, noticeSets, [], saddleOwned);
 Check(saddleNotice.ObserveOwnership(100, noticeSets, hat100, hat100).Count == 0,
     "Withdrawing previously checked saddlebag gear does not trigger a new-acquisition message");
 
+OwnedItem GearInBag(uint id, int inventorySlot, uint[]? melds = null, bool hq = false) =>
+    new(id, 1, "Bag 1", false, melds ?? []) { Container = 0, InventorySlot = inventorySlot, HighQuality = hq };
+OwnedItem Worn(uint id, int slot, uint[]? melds = null, bool hq = false) =>
+    new(id, 1, "Equipped", true, melds ?? []) { Container = 1000, InventorySlot = slot, HighQuality = hq };
+TrackedSet EquipSet(params GearPiece[] targets) => new() { Name = "Equip test", Job = "BRD", Pieces = targets.ToList() };
+var equip = new EquipSetSession();
+var headTarget = new GearPiece { Slot = "Head", ItemId = 100, Materia = [1] };
+var bodyTarget = new GearPiece { Slot = "Body", ItemId = 102 };
+var equipSet = EquipSet(headTarget, bodyTarget);
+equip.Start(equipSet, 100, "BRD", 0);
+var equipMove = equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [1]), GearInBag(102, 2)], 1);
+Check(equipMove?.Destination == 2 && equipMove.Source.InventorySlot == 1,
+    "Equip pass chooses the exact available copy and the correct equipment destination");
+Check(equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [1]), GearInBag(102, 2)], 2) == null,
+    "An unacknowledged equip is not repeatedly issued");
+equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1]), GearInBag(102, 2)], 3);
+var nextEquip = equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1]), GearInBag(102, 2)], 400);
+Check(nextEquip?.Destination == 3 && equip.Results.Single().Kind == EquipResultKind.Equipped,
+    "Equip pass verifies the first slot before advancing to the next available piece");
+equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1]), Worn(102, 3)], 401);
+Check(!equip.Running && equip.Results.Count == 2 && equip.Results.All(r => r.Kind == EquipResultKind.Equipped),
+    "A fully equipped set ends with verified per-piece results");
+equip.Start(EquipSet(headTarget), 100, "BRD", 0);
+Check(equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1])], 1) == null && equip.Results.Single().Kind == EquipResultKind.AlreadyEquipped,
+    "Already-correct equipment is reported without an unnecessary swap");
+equip.Start(equipSet, 100, "BRD", 0);
+equip.Tick(100, "BRD", true, false, [GearInBag(102, 2)], 1);
+Check(equip.Results.Single().Kind == EquipResultKind.Missing && equip.Running,
+    "A missing piece is reported while the rest of the set remains eligible");
+Check(equip.Tick(100, "BRD", true, false, [GearInBag(102, 2)], 400)?.Piece.ItemId == 102,
+    "Finding one item missing does not stop equipping later available pieces");
+equip.Reject("Requires a higher level.", 401);
+Check(!equip.Running && equip.Results.Last().Kind == EquipResultKind.Failed && equip.Results.Last().Details.Contains("level"),
+    "Found but unequippable items are distinguished from missing items");
+equip.Start(EquipSet(headTarget), 100, "BRD", 0);
+equip.Tick(100, "BRD", true, false, [new(100, 1, "Chocobo saddlebag (saved)", false, [1], DateTimeOffset.UtcNow)], 1);
+Check(equip.Results.Single().Kind == EquipResultKind.Stored && equip.Results.Single().Details.Contains("saddlebag"),
+    "Saddlebag-only gear is reported with its location and withdrawal instruction instead of being equipped remotely");
+equip.Start(EquipSet(headTarget), 100, "BRD", 0);
+var timedMove = equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [1])], 1);
+equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [1])], 8001);
+Check(timedMove != null && equip.Results.Single().Kind == EquipResultKind.Failed && !equip.Running,
+    "An equip without game confirmation times out and reports a failure");
+GearPiece[] duplicateRingTargets = [new() { Slot = "RingLeft", ItemId = 105 }, new() { Slot = "RingRight", ItemId = 105 }];
+equip.Start(EquipSet(duplicateRingTargets), 100, "BRD", 0);
+equip.Tick(100, "BRD", true, false, [Worn(105, 12)], 1);
+equip.Tick(100, "BRD", true, false, [Worn(105, 12)], 400);
+Check(equip.Results.Count(r => r.Kind == EquipResultKind.Missing) == 1 && equip.Results.Count(r => r.Kind == EquipResultKind.AlreadyEquipped) == 1,
+    "One owned ring never fills two slots and its already-correct hand is preserved");
+equip.Start(EquipSet(duplicateRingTargets), 100, "BRD", 0);
+equip.Tick(100, "BRD", true, false, [new(105, 1, "Retainer: Test (saved)", false, [], DateTimeOffset.UtcNow)], 1);
+equip.Tick(100, "BRD", true, false, [new(105, 1, "Retainer: Test (saved)", false, [], DateTimeOffset.UtcNow)], 400);
+Check(equip.Results.Count(r => r.Kind == EquipResultKind.Stored) == 1 && equip.Results.Count(r => r.Kind == EquipResultKind.Missing) == 1,
+    "A single saved ring is not reported as two separately available stored copies");
+equip.Start(EquipSet(duplicateRingTargets), 100, "BRD", 0);
+OwnedItem[] twoSavedRings = [new(105, 1, "Retainer: Test (saved)", false, [], DateTimeOffset.UtcNow), new(105, 1, "Retainer: Test (saved)", false, [], DateTimeOffset.UtcNow)];
+equip.Tick(100, "BRD", true, false, twoSavedRings, 1); equip.Tick(100, "BRD", true, false, twoSavedRings, 400);
+Check(equip.Results.All(r => r.Kind == EquipResultKind.Stored), "Two actual saved copies in one storage source are both reported accurately");
+var ringLeft = new GearPiece { Slot = "RingLeft", ItemId = 105, Materia = [1] };
+var ringRight = new GearPiece { Slot = "RingRight", ItemId = 105, Materia = [2] };
+equip.Start(EquipSet(ringLeft, ringRight), 100, "BRD", 0);
+var ringSwap = equip.Tick(100, "BRD", true, false, [Worn(105, 11, [2]), Worn(105, 12, [1])], 1);
+Check(ringSwap?.Source.InventorySlot == 12 && ringSwap.Destination == 11,
+    "Different ring materia targets select the matching physical copy even when hands are swapped");
+OwnedItem[] swappedRings = [Worn(105, 11, [1]), Worn(105, 12, [2])];
+equip.Tick(100, "BRD", true, false, swappedRings, 2); equip.Tick(100, "BRD", true, false, swappedRings, 400);
+Check(!equip.Running && equip.Results.Last().Kind == EquipResultKind.AlreadyEquipped,
+    "Fresh allocation recognizes the second ring after the first swap relocates it");
+equip.Start(EquipSet(headTarget), 100, "BRD", 0);
+Check(equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [3]), GearInBag(100, 2, [1])], 1)?.Source.InventorySlot == 2,
+    "Equip selection prefers the correctly melded available copy");
+equip.Stop(); equip.Start(EquipSet(new GearPiece { Slot = "Head", ItemId = 100 }), 100, "BRD", 0);
+Check(equip.Tick(100, "BRD", true, false, [Worn(100, 2), GearInBag(100, 3, hq: true)], 1)?.Source.HighQuality == true,
+    "HQ copies are preferred over NQ when materia quality is otherwise tied");
+equip.Stop();
+foreach (var interruption in new[] { (200UL, "BRD", true, false), (100UL, "WAR", true, false), (100UL, "BRD", false, false), (100UL, "BRD", true, true) })
+{
+    equip.Start(equipSet, 100, "BRD", 0);
+    equip.Tick(interruption.Item1, interruption.Item2, interruption.Item3, interruption.Item4, [GearInBag(100, 1)], 1);
+    Check(!equip.Running && equip.Results.All(r => r.Kind == EquipResultKind.NotProcessed),
+        "Character, job, loading and busy/combat changes cancel remaining equip requests");
+}
+equip.Start(equipSet, 100, "BRD", 0); equip.Stop();
+Check(equip.Tick(100, "BRD", true, false, [GearInBag(100, 1)], 1) == null && equip.Results.Count == 2,
+    "Stop leaves no future equipment requests and reports unprocessed pieces");
+Reject(() => equip.Start(new() { IsGlam = true, Pieces = [headTarget] }, 100, "BRD", 0), "Glam collections cannot be equipped as a single loadout");
+Reject(() => equip.Start(EquipSet(headTarget), 100, "WAR", 0), "Equip set does not change jobs or equip another job's loadout");
+Reject(() => equip.Start(EquipSet(headTarget, headTarget), 100, "BRD", 0), "Duplicate target slots are rejected before any equipment changes");
+Reject(() => equip.Start(EquipSet(), 100, "BRD", 0), "Empty sets cannot start an equip pass");
+equip.Start(EquipSet(headTarget), 100, "BRD", 0);
+var armoryCopy = GearInBag(100, 7, [1]) with { Container = 3202, Location = "Armoury Chest" };
+Check(equip.Tick(100, "BRD", true, false, [armoryCopy], 1)?.Source.Container == 3202,
+    "Available Armoury Chest gear is selected directly without moving it through bags first");
+equip.Tick(100, "BRD", true, false, [Worn(100, 2) with { Materia = null }], 2);
+Check(equip.Running && equip.Results.Count == 0, "Unknown destination materia cannot prematurely verify a specific known-meld copy");
+equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1])], 3);
+Check(!equip.Running && equip.Results.Single().Kind == EquipResultKind.Equipped, "Equip verification completes once the selected copy's meld data is readable");
+equip.Start(equipSet, 100, "BRD", 0);
+equip.Tick(100, "BRD", true, false, [GearInBag(100, 1, [1]), GearInBag(102, 2)], 1);
+equip.Tick(100, "BRD", true, false, [Worn(100, 2, [1]), GearInBag(102, 2)], 2);
+equip.Tick(100, "BRD", true, false, [Worn(999, 2), GearInBag(102, 2)], 400);
+Check(!equip.Running && equip.Results[0].Kind == EquipResultKind.Failed && equip.Results[1].Kind == EquipResultKind.NotProcessed,
+    "Changing completed equipment cancels the pass and does not leave a false equipped result");
+
 if (args.Contains("--live"))
 {
     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };

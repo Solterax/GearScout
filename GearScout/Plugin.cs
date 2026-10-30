@@ -63,6 +63,7 @@ public sealed class Plugin : IDalamudPlugin
     internal MeldData MeldingData { get; }
     internal MeldGuide MeldingGuide { get; } = new();
     internal AutomaticMeldController AutoMelding { get; }
+    internal EquipSetController Equipper { get; }
     internal string MeldingWindowStatus { get; private set; } = "";
     internal RetainerScanController RetainerScan { get; }
     internal bool StorageSavePending => storageSavePending;
@@ -81,6 +82,7 @@ public sealed class Plugin : IDalamudPlugin
         Catalog = new GearCatalog(Data);
         MeldingData = new MeldData(Data);
         AutoMelding = new AutomaticMeldController(this);
+        Equipper = new EquipSetController(this);
         meldingWindow = new MeldingWindow(this);
         RetainerScan = new RetainerScanController(this);
         setEditor = new SetEditorWindow(this);
@@ -106,6 +108,11 @@ public sealed class Plugin : IDalamudPlugin
     internal void CreateGlamSet() => setEditor.CreateGlam();
     internal void EditSet(TrackedSet set, string? slot = null) => setEditor.Open(set, slot);
     internal void OpenMelding(TrackedSet set) => meldingWindow.Open(set);
+    internal void EquipSet(TrackedSet set)
+    {
+        try { Equipper.Start(set); nextScan = 0; Message = ""; MessageIsError = false; }
+        catch (Exception ex) { ReportError(ex.Message); }
+    }
     internal void RequestMeldingWindow() { openMeldRequested = true; MeldingWindowStatus = "Opening the game's melding window..."; }
 
     internal void SaveLocalSet(TrackedSet set)
@@ -242,6 +249,7 @@ public sealed class Plugin : IDalamudPlugin
         if (ready) UpdateStorage();
         else wantedItems.Suspend();
         if (!ready && AutoMelding.Running) AutoMelding.Session.Stop("Automatic melding stopped: character or loading changed.");
+        if (!ready && Equipper.Running) Equipper.Stop("Character or loading changed.");
         if (openMeldRequested)
         {
             openMeldRequested = false;
@@ -255,19 +263,20 @@ public sealed class Plugin : IDalamudPlugin
         }
         RetainerScan.Update(ready);
         // Loot highlighting and chat notifications need fresh ownership with the checklist closed.
-        if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Config.HighlightLoot && !Config.NotifyWantedItems)
+        if (!window.IsOpen && !meldingWindow.IsOpen && !MeldingGuide.Running && !Equipper.Running && !Config.HighlightLoot && !Config.NotifyWantedItems)
         {
             Owned = null;
             wantedItems.Suspend();
             return;
         }
         if (!ready || Environment.TickCount64 < nextScan) return;
-        nextScan = Environment.TickCount64 + (AutoMelding.Running ? 150 : 1000);
+        nextScan = Environment.TickCount64 + (AutoMelding.Running || Equipper.Running ? 150 : 1000);
         try
         {
             var live = InventoryReader.Read(Inventory, Data);
             Owned = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
             AutoMelding.Update(ready);
+            Equipper.Update(ready);
             UpdateWantedNotifications(live);
         }
         catch (Exception ex)
@@ -275,6 +284,7 @@ public sealed class Plugin : IDalamudPlugin
             Owned = null;
             wantedItems.Suspend();
             AutoMelding.Session.Stop("Automatic melding stopped: live inventory is unavailable.");
+            Equipper.Stop("Live inventory is unavailable.");
             nextScan = Environment.TickCount64 + 5000;
             Log.Warning(ex, "Could not read character inventory");
         }
@@ -401,6 +411,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         RetainerScan.Stop();
         AutoMelding.Stop();
+        Equipper.Stop("GearScout unloaded.");
         Inventory.InventoryChanged -= OnInventoryChanged;
         AddonLifecycle.UnregisterListener(AddonEvent.PostSetup, StorageAddons, OnStorageOpened);
         AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, StorageAddons, OnStorageClosing);
