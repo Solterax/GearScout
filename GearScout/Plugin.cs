@@ -36,6 +36,9 @@ public sealed class Plugin : IDalamudPlugin
     private readonly LootHighlighter lootHighlighter;
     private readonly StorageScanner storageScanner = new();
     private readonly WantedItemTracker wantedItems = new();
+    private readonly OwnershipCache ownershipCache = new();
+    private uint lastJobId;
+    internal long SettingsRevision { get; private set; }
     private readonly ZoneEquipSession zoneEquip = new();
     private readonly HttpClient http = new() { Timeout = TimeSpan.FromSeconds(30) };
     private readonly CancellationTokenSource lifetime = new();
@@ -316,7 +319,9 @@ public sealed class Plugin : IDalamudPlugin
 
         var ready = Client.IsLoggedIn && Player.IsLoaded && Player.ClassJob.IsValid &&
                     !Condition[ConditionFlag.BetweenAreas] && !Condition[ConditionFlag.BetweenAreas51];
-        var job = ready ? Player.ClassJob.Value.Abbreviation.ToString().ToUpperInvariant() : "";
+        var jobId = ready ? Player.ClassJob.RowId : 0;
+        var job = ready ? (jobId == lastJobId ? CurrentJob : Player.ClassJob.Value.Abbreviation.ToString().ToUpperInvariant()) : "";
+        lastJobId = jobId;
         var contentId = ready ? Player.ContentId : 0;
         if (pendingGearCapture is { } capture)
         {
@@ -334,11 +339,12 @@ public sealed class Plugin : IDalamudPlugin
             }
             catch (Exception ex) { ReportError("Could not save current gear: " + ex.Message); Log.Warning(ex, "Current gear capture failed"); }
         }
-        if (job != CurrentJob || contentId != characterId || !ready)
+        if (job != CurrentJob || contentId != characterId)
         {
             if (contentId != characterId || !ready)
             {
                 storageScanner.Reset();
+                ownershipCache.Reset();
                 nextStorageScan = 0;
                 storageScanRequested = false;
                 storageRefreshPending = false;
@@ -379,9 +385,9 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             var live = InventoryReader.Read(Inventory, Data);
-            var ownership = StorageCache.Merge(live, Config.StorageSnapshots, characterId);
+            var ownership = ownershipCache.Merge(live, Config.StorageSnapshots, characterId);
             // Keep UI plans cached while still reading fresh native slots for automation validation.
-            if (!StorageCache.SameOwnership(Owned, ownership)) Owned = ownership;
+            Owned = ownership;
             AutoMelding.Update(ready);
             Equipper.Update(ready);
             UpdateWantedNotifications(live);
@@ -509,6 +515,7 @@ public sealed class Plugin : IDalamudPlugin
 
     internal void Save()
     {
+        SettingsRevision++;
         missingLootTargets = null;
         PluginInterface.SavePluginConfig(Config);
         storageSavePending = false;

@@ -8,6 +8,7 @@ internal sealed class MainWindow : Window
 {
     private readonly Plugin plugin;
     private readonly ZoneAssignmentUi zoneAssignments;
+    private readonly SetMatchCache matches = new();
     private string link = "";
     private bool missingOnly;
     private string currentGearName = "";
@@ -68,6 +69,7 @@ internal sealed class MainWindow : Window
         var job = plugin.CurrentJob;
         if (string.IsNullOrEmpty(job))
         {
+            matches.Clear();
             ImGui.TextWrapped("Log in and finish loading to see sets for your current class or job.");
             return;
         }
@@ -160,12 +162,11 @@ internal sealed class MainWindow : Window
         var owned = plugin.Owned;
         if (owned == null)
         {
+            matches.Clear();
             ImGui.TextWrapped("Waiting for your character's inventory. Ownership is not yet known.");
             return;
         }
-        IEnumerable<GearPiece> pieces = selected.Pieces;
-        if (selected.IsGlam) pieces = pieces.OrderBy(p => Array.IndexOf(GearSearch.Slots, p.Slot));
-        var statuses = GearMatcher.Match(pieces, owned, selected.IsGlam);
+        var statuses = matches.Get(selected, owned, plugin.SettingsRevision);
         var have = statuses.Count(s => s.Match != null);
         var melded = statuses.Count(s => s.Melds is { IsExact: true });
         ImGui.Spacing();
@@ -333,7 +334,7 @@ internal sealed class MainWindow : Window
         catch (Exception ex) { plugin.ReportError($"Could not save settings: {ex.Message}"); }
     }
 
-    public override void OnClose() { if (plugin.Equipper.Running) plugin.Equipper.Stop("GearScout window closed."); }
+    public override void OnClose() { matches.Clear(); if (plugin.Equipper.Running) plugin.Equipper.Stop("GearScout window closed."); }
 
     private static string SlotName(string slot) => slot switch
     {

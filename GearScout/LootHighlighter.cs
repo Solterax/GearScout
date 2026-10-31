@@ -16,6 +16,8 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
     private bool nameFaulted;
     private nint coloredAddon;
     private readonly Dictionary<nint, NameStyle> originalTextColors = [];
+    private readonly List<LootRollEntry> overlayRolls = [];
+    private readonly List<LootRollEntry> nameRolls = [];
     private static readonly ByteColor NameBlue = new() { R = 88, G = 174, B = 255, A = 255 };
     private sealed record NameStyle(uint Color, byte[] OriginalText, byte[] AppliedText);
 
@@ -55,7 +57,8 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
         if (list == null) return;
         var count = list->GetItemCount();
         if (count < 0 || count > addon->Items.Length) return;
-        var rolls = new List<LootRollEntry>(loot->Items.Length);
+        var rolls = overlayRolls;
+        rolls.Clear();
         foreach (ref readonly var entry in loot->Items)
             rolls.Add(new(entry.ItemId, (entry.RollState is RollState.UpToNeed or RollState.UpToGreed) &&
                 entry.RollResult == RollResult.UnAwarded && entry.Time > 0));
@@ -125,7 +128,8 @@ internal sealed unsafe class LootHighlighter(Plugin plugin) : IDisposable
             if (loot == null) return;
             var targets = plugin.MissingLootTargets;
             if (targets.Count == 0) return;
-            var rolls = new List<LootRollEntry>(loot->Items.Length);
+            var rolls = nameRolls;
+            rolls.Clear();
             foreach (ref readonly var entry in loot->Items)
                 rolls.Add(new(entry.ItemId, (entry.RollState is RollState.UpToNeed or RollState.UpToGreed) &&
                     entry.RollResult == RollResult.UnAwarded && entry.Time > 0));

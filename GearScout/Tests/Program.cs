@@ -878,6 +878,7 @@ Check(!StorageCache.SameOwnership([originalCopy], null) && !StorageCache.SameOwn
 
 ZoneEquipChecks.Run(Check, Reject);
 CurrentGearChecks.Run(Check, Reject);
+PerformanceCacheChecks.Run(Check);
 
 if (args.Contains("--live"))
 {

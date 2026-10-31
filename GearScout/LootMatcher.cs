@@ -1,6 +1,6 @@
 namespace GearScout;
 
-public sealed record LootRollEntry(uint ItemId, bool CanRoll);
+public readonly record struct LootRollEntry(uint ItemId, bool CanRoll);
 
 public static class LootMatcher
 {

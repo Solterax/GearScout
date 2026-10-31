@@ -20,6 +20,8 @@
     <Compile Include="../EquipSetSession.cs" Link="EquipSetSession.cs" />
     <Compile Include="../ZoneEquipSession.cs" Link="ZoneEquipSession.cs" />
     <Compile Include="../CurrentGearSet.cs" Link="CurrentGearSet.cs" />
+    <Compile Include="../OwnershipCache.cs" Link="OwnershipCache.cs" />
+    <Compile Include="../SetMatchCache.cs" Link="SetMatchCache.cs" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

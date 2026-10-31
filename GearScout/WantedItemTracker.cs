@@ -7,17 +7,19 @@ public sealed class WantedItemTracker
 {
     private ulong owner;
     private bool needsBaseline = true;
+    private IReadOnlyCollection<OwnedItem>? lastOwnership;
     private readonly HashSet<uint> knownItems = [];
     private readonly HashSet<(uint Chest, uint Index, uint Item)> seenLoot = [];
     private readonly Queue<(uint Chest, uint Index, uint Item)> lootHistory = [];
 
-    public void Suspend() => needsBaseline = true;
+    public void Suspend() { needsBaseline = true; lastOwnership = null; }
 
     public List<WantedItemNotice> ObserveOwnership(ulong characterId, IReadOnlyCollection<TrackedSet> sets,
         IReadOnlyCollection<OwnedItem>? live, IReadOnlyCollection<OwnedItem>? owned, bool storageTransfer = false)
     {
         SelectCharacter(characterId);
         if (characterId == 0 || live == null || owned == null) { Suspend(); return []; }
+        if (!needsBaseline && ReferenceEquals(lastOwnership, owned)) return [];
         var notices = new List<WantedItemNotice>();
         if (!needsBaseline && !storageTransfer)
         {
@@ -33,6 +35,7 @@ public sealed class WantedItemTracker
         // set edits and later reacquiring a previously seen item must not look like a new find.
         knownItems.UnionWith(owned.Where(i => i.Quantity > 0).Select(i => LootMatcher.BaseItemId(i.ItemId)).Where(id => id != 0));
         needsBaseline = false;
+        lastOwnership = owned;
         return notices;
     }
 
@@ -69,6 +72,7 @@ public sealed class WantedItemTracker
         if (characterId == 0 || characterId == owner) return;
         owner = characterId;
         knownItems.Clear(); seenLoot.Clear(); lootHistory.Clear(); needsBaseline = true;
+        lastOwnership = null;
     }
 
     private static List<string> Labels(IEnumerable<TrackedSet> sets) => sets

@@ -65,9 +65,11 @@ public static class GearMatcher
         Func<GearPiece, OwnedItem, int>? preference = null)
     {
         var targets = pieces.ToList();
-        var owned = inventory.Where(i => i.Quantity > 0).OrderByDescending(i => i.Equipped).ToList();
+        var targetIds = targets.Select(p => p.ItemId).ToHashSet();
+        var owned = inventory.Where(i => i.Quantity > 0 && targetIds.Contains(i.ItemId)).ToLookup(i => i.ItemId);
         // One owned appearance can be reused in multiple glam slots, including both rings.
-        if (appearanceOnly) return targets.Select(p => Match([p], owned)[0]).ToList();
+        if (appearanceOnly) return targets.Select(p => new PieceStatus(p,
+            owned[p.ItemId].OrderByDescending(i => i.Equipped).MaxBy(i => Score(p, i)))).ToList();
         var matches = new OwnedItem?[targets.Count];
         foreach (var group in targets.Select((piece, index) => (piece, index)).GroupBy(p => p.piece.ItemId))
         {
@@ -77,7 +79,7 @@ public static class GearMatcher
             // Each DP mask represents filled target slots; each physical copy is offered once.
             var states = new Assignment?[1 << slots.Count];
             states[0] = new(0, new OwnedItem?[slots.Count]);
-            foreach (var item in owned.Where(i => i.ItemId == group.Key))
+            foreach (var item in owned[group.Key].OrderByDescending(i => i.Equipped))
             for (var copy = 0; copy < Math.Min(item.Quantity, slots.Count); copy++)
             {
                 var next = (Assignment?[])states.Clone();

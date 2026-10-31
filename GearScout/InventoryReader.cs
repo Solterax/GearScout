@@ -38,6 +38,7 @@ internal static class InventoryReader
         IGameInventory inventory, IDataManager data)
     {
         var result = new List<OwnedItem>();
+        var materiaSheet = data.GetExcelSheet<Materia>();
         foreach (var (type, label, equipped) in containers)
         {
             var slots = inventory.GetInventoryItems((GameInventoryType)type);
@@ -47,22 +48,22 @@ internal static class InventoryReader
             {
                 if (!item.IsEmpty && item.BaseItemId != 0 && item.Quantity > 0)
                 {
-                    var melds = new List<uint>();
+                    List<uint>? melds = null;
                     var known = true;
                     var types = item.Materia;
                     var grades = item.MateriaGrade;
                     for (var index = 0; index < types.Length; index++)
                     {
                         if (types[index] == 0) continue;
-                        if (index >= grades.Length || !data.GetExcelSheet<Materia>().TryGetRow(types[index], out var row) ||
+                        if (index >= grades.Length || !materiaSheet.TryGetRow(types[index], out var row) ||
                             grades[index] >= row.Item.Count || row.Item[grades[index]].RowId == 0)
                         {
                             known = false;
                             break;
                         }
-                        melds.Add(row.Item[grades[index]].RowId);
+                        (melds ??= []).Add(row.Item[grades[index]].RowId);
                     }
-                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped, known ? melds : null)
+                    result.Add(new(item.BaseItemId, item.Quantity, label, equipped, known ? (IReadOnlyList<uint>?)melds ?? Array.Empty<uint>() : null)
                     {
                         Container = (int)type, InventorySlot = checked((int)item.InventorySlot), HighQuality = item.IsHq,
                     });

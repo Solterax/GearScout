@@ -115,11 +115,12 @@ internal sealed unsafe class StorageScanner
             if (!Stable("dresser", 0)) return;
             var items = new List<StoredItem>();
             var seen = new HashSet<(uint Slot, uint ItemId)>();
+            var itemSheet = data.GetExcelSheet<Item>();
             // This array includes expanded outfit pieces across every page/filter, not glamour plates.
             foreach (ref readonly var item in agent->Data->PrismBoxItems)
             {
                 var id = LootMatcher.BaseItemId(item.ItemId);
-                if (id == 0 || !data.GetExcelSheet<Item>().TryGetRow(id, out var row) ||
+                if (id == 0 || !itemSheet.TryGetRow(id, out var row) ||
                     row.EquipSlotCategory.RowId == 0 || !seen.Add((item.Slot, id))) continue;
                 items.Add(new() { ItemId = id, Quantity = 1, Materia = [] });
             }

@@ -8,10 +8,13 @@ internal sealed class MateriaTargetEditor(Plugin plugin)
     private GearPiece? piece;
     private List<uint> target = [];
     private string query = "";
+    private string? lastQuery;
+    private int lastMateriaCount;
+    private List<MateriaOption> results = [];
     public bool Changed { get; private set; }
     public void Open(GearPiece selected)
     {
-        piece = selected; target = selected.Materia?.ToList() ?? []; query = "";
+        piece = selected; target = selected.Materia?.ToList() ?? []; query = ""; lastQuery = null;
         ImGui.OpenPopup("Materia targets");
     }
 
@@ -33,12 +36,18 @@ internal sealed class MateriaTargetEditor(Plugin plugin)
         ImGui.SetNextItemWidth(-1);
         ImGui.InputTextWithHint("##materiaQuery", "Search materia by name or item ID", ref query, 150);
         if (plugin.MeldingData.Error != null) ImGui.TextWrapped(plugin.MeldingData.Error);
+        if (lastQuery != query || lastMateriaCount != plugin.MeldingData.Materia.Count)
+        {
+            var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            results = plugin.MeldingData.Materia.Values.Where(m => m.Value > 0 &&
+                words.All(t => m.Name.Contains(t, StringComparison.OrdinalIgnoreCase) || m.ItemId.ToString() == t))
+                .OrderByDescending(m => m.MinimumItemLevel).ThenBy(m => m.Name).ToList();
+            lastQuery = query; lastMateriaCount = plugin.MeldingData.Materia.Count;
+        }
         if (ImGui.BeginChild("materiaResults", new Vector2(0, 220), true))
         {
             ImGui.BeginDisabled(target.Count >= 5);
-            foreach (var m in plugin.MeldingData.Materia.Values.Where(m => m.Value > 0 &&
-                query.Split(' ', StringSplitOptions.RemoveEmptyEntries).All(t => m.Name.Contains(t, StringComparison.OrdinalIgnoreCase) || m.ItemId.ToString() == t))
-                .OrderByDescending(m => m.MinimumItemLevel).ThenBy(m => m.Name))
+            foreach (var m in results)
                 if (ImGui.Selectable($"{m.Name}##materia-{m.ItemId}")) target.Add(m.ItemId);
             ImGui.EndDisabled();
         }
