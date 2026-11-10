@@ -4,6 +4,8 @@ Build gear sets inside the game or import them from XIVGear. Switch between save
 
 ## Install
 
+GearScout v0.14.3 is rebuilt against Dalamud 15.0.3.9 (API 15), with installed-game data checks run against game build `2026.11.03.0000.0000`. This game update does not require an API-level change.
+
 1. Open Dalamud settings with `/xlsettings`.
 2. Under **Experimental → Custom Plugin Repositories**, add and enable:
 
