@@ -22,6 +22,8 @@
     <Compile Include="../CurrentGearSet.cs" Link="CurrentGearSet.cs" />
     <Compile Include="../OwnershipCache.cs" Link="OwnershipCache.cs" />
     <Compile Include="../SetMatchCache.cs" Link="SetMatchCache.cs" />
+    <Compile Include="../TextGearImporter.cs" Link="TextGearImporter.cs" />
+    <None Include="fixtures/crafting.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="fixtures/bard.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

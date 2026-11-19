@@ -31,6 +31,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MainWindow window;
     private readonly SetEditorWindow setEditor;
     private readonly MeldingWindow meldingWindow;
+    private readonly TextImportWindow textImportWindow;
     private bool openMeldRequested;
     private long meldingOpenDeadline;
     private readonly LootHighlighter lootHighlighter;
@@ -110,11 +111,13 @@ public sealed class Plugin : IDalamudPlugin
         meldingWindow = new MeldingWindow(this);
         RetainerScan = new RetainerScanController(this);
         setEditor = new SetEditorWindow(this);
+        textImportWindow = new TextImportWindow(this);
         lootHighlighter = new LootHighlighter(this);
         lootHighlighter.Initialize();
         windows.AddWindow(window);
         windows.AddWindow(setEditor);
         windows.AddWindow(meldingWindow);
+        windows.AddWindow(textImportWindow);
         Commands.AddHandler("/gearscout", new CommandInfo(OnCommand) { HelpMessage = "Open XIVGear gear tracking." });
         PluginInterface.UiBuilder.Draw += windows.Draw;
         PluginInterface.UiBuilder.Draw += lootHighlighter.Draw;
@@ -132,6 +135,13 @@ public sealed class Plugin : IDalamudPlugin
     private void Open() => window.IsOpen = true;
     internal void CreateSet() { if (!string.IsNullOrEmpty(CurrentJob)) setEditor.Create(CurrentJob); }
     internal void CreateGlamSet() => setEditor.CreateGlam();
+    internal void OpenTextImport() => textImportWindow.Open();
+    internal void SaveTextImport(TrackedSet set)
+    {
+        SaveLocalSet(set);
+        Message = $"Imported {set.Name}: {set.Pieces.Count} pieces for {set.Job}. Switch to {set.Job} to view it if needed.";
+        MessageIsError = false;
+    }
     internal void SaveCurrentGear(string name)
     {
         if (SavingCurrentGear) throw new InvalidOperationException("A current-gear save is already pending.");

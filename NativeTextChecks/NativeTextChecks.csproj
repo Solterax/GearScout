@@ -13,6 +13,10 @@
     <Compile Include="../GearScout/MeldData.cs" Link="MeldData.cs" />
     <Compile Include="../GearScout/MeldPlanner.cs" Link="MeldPlanner.cs" />
     <Compile Include="../GearScout/Models.cs" Link="Models.cs" />
+    <Compile Include="../GearScout/GearSearch.cs" Link="GearSearch.cs" />
+    <Compile Include="../GearScout/TextGearImporter.cs" Link="TextGearImporter.cs" />
+    <Compile Include="../GearScout/LootMatcher.cs" Link="LootMatcher.cs" />
+    <None Include="../GearScout/Tests/fixtures/crafting.txt" Link="crafting.txt" CopyToOutputDirectory="PreserveNewest" />
     <Reference Include="Dalamud"><HintPath>$(DalamudPath)/Dalamud.dll</HintPath></Reference>
     <Reference Include="Lumina"><HintPath>$(DalamudPath)/Lumina.dll</HintPath></Reference>
     <Reference Include="Lumina.Excel"><HintPath>$(DalamudPath)/Lumina.Excel.dll</HintPath></Reference>

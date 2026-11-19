@@ -14,6 +14,8 @@ public static class GearSearch
         return index < 0 ? 0 : 1UL << index;
     }
 
+    public static IEnumerable<string> JobsForMask(ulong mask) => Jobs.Where(j => (JobBit(j) & mask) != 0);
+
     public static ulong SlotBit(string slot)
     {
         var index = Array.IndexOf(Slots, slot);

@@ -24,6 +24,8 @@ Example Bard link: https://xivgear.app/sl/aadb9265-3645-45ae-8af6-3215eb26d637
 
 ## Build a set in game
 
+To import a copied gear list, click **Import pasted gear...**, paste item names with their materia beneath them, and click **Review import**. Plain text and Markdown bold item names are accepted, including `HQ` suffixes and repeated ring entries. Give the set a name, confirm its compatible job, and click **Save imported set**. Shared crafting pieces offer a job choice; tools narrow the choice automatically. The Alchemist example with **Alembic of Stars** and **Gold Thumb's Mortar** resolves to ALC. Imports preserve materia order and repeats; unknown or ambiguous names are reported with a line number before anything can be saved. Names must match your installed game-data language. HQ labels are accepted for name lookup; gear sets do not track HQ/NQ targets.
+
 1. Open `/gearscout` and click **New set**. The set belongs to the job you are currently playing.
 2. Give it a name. Click **Select gear...** beside a slot (or click the existing piece) to open the search text box.
 3. Search by item name, words in any order, or item ID. Results are filtered to equipment that fits the slot and can be equipped by the set's job, sorted by item level. Higher-level gear is included for planning ahead.

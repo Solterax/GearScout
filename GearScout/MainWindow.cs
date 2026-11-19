@@ -58,6 +58,7 @@ internal sealed class MainWindow : Window
         ImGui.BeginDisabled(plugin.Importing || string.IsNullOrWhiteSpace(link));
         if (ImGui.Button(plugin.Importing ? "Loading" : "Import")) plugin.StartImport(link);
         ImGui.EndDisabled();
+        if (ImGui.Button("Import pasted gear...")) plugin.OpenTextImport();
         if (!string.IsNullOrEmpty(plugin.Message))
         {
             ImGui.PushStyleColor(ImGuiCol.Text, plugin.MessageIsError ? Amber : Muted);

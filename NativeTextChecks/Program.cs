@@ -63,4 +63,5 @@ if (args.Length == 2 && args[0] == "--game-data")
     if (generalActions.GetRow(12).Name.ToString() != "Materia Melding" || generalActions.GetRow(13).Name.ToString() != "Advanced Materia Melding")
         throw new Exception("Native melding action IDs are incorrect");
     Console.WriteLine("7 installed-game melding checks passed: materia lookup, accessory/armor rates, grade/retrieval rules, stat caps, advanced permission, socketless relic exclusion and native action IDs.");
+    GameTextImportChecks.Run(game, meldData.Materia.Values);
 }
